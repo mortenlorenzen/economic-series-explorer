@@ -43,7 +43,7 @@ quarto preview                 # local site with live reload
 ./run-tests.sh                 # testthat + node --test, on saved fixtures
 ```
 
-## Adding a series
+## Adding or removing a series
 
 Add one row to `series.csv`; no other file changes. The next pipeline run fetches the series and it shows up in the picker.
 
@@ -56,6 +56,37 @@ Add one row to `series.csv`; no other file changes. The next pipeline run fetche
 | `transform` | `none` or `yoy` (year-over-year % change) |
 | `unit` | Y-axis label in actual-values mode |
 | `max_stale_days` | The pipeline warns if the newest observation is older than this, and fails above twice this |
+
+### With Claude Code
+
+Open Claude Code in the repo and ask in plain words. It knows the project from `CLAUDE.md` and `specs/`. Then check the result on localhost and merge the PR.
+
+**Add a series**, giving the source and symbol (an approximate name is fine):
+
+```
+Add a series: FRED, Copper price
+Add Yahoo Finance series Gold = "GC=F" and Hang Seng = ^HSI
+```
+
+Claude Code will:
+
+1. Check each symbol against Yahoo or FRED, and ask if one doesn't exist or has stopped updating, since a stale series stops the daily pipeline.
+2. Write a short spec in `specs/`.
+3. Add the rows to `series.csv` and update the registry test.
+4. Run `Rscript get_data.R` and `./run-tests.sh`.
+5. Open a PR.
+
+Say "show me on localhost" to try it before merging.
+
+**Remove a series**:
+
+```
+Remove the series Bitcoin
+```
+
+Claude Code deletes the row in `series.csv` and the series' file `data/<id>.json`, since the pipeline doesn't delete old files. It also updates the registry test and the text that lists the series (README, mission), then opens a PR. Other series may change colour, because colours follow registry order.
+
+**Rename or recategorise** works the same way ("rename Crude Oil (WTI) to Oil", "move Gold to Markets"). Only the row changes; the data is refreshed on the next run.
 
 ## Repository layout
 
