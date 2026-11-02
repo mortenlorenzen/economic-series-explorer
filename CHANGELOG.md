@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-11-02
+- Phase 10: a series that fails to load is named above the chart while the others still plot; all six edge cases in the brief checked; y-axis labels no longer touch the top tick
 - Phase 9: PNG and CSV export of the current chart; CSV in long format at full resolution, PNG with every panel, title and source caption at 2×
 - Phase 8: series files cached after the first download; daily series drawn as weekly averages for windows over 10 years
 - Phase 7: Display (Indexed / Actual values) and Y-axis scale (Linear / Log) controls; actual-values chart for one series; log on the levels panel

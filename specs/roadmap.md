@@ -11,7 +11,7 @@ Very small phases. Each phase = one branch = one `specs/YYYY-MM-DD-feature-name/
 - [x] Phase 7 — Actual-values mode and log scale (covers BRIEF §6.4 Display/Y-axis, §6.6 actual values)
 - [x] Phase 8 — Loading cache and downsampling (covers BRIEF §6.4 Loading, §6.6 Downsampling)
 - [x] Phase 9 — PNG and CSV export (covers BRIEF §6.7 export)
-- [ ] Phase 10 — Edge cases (covers BRIEF §6.7 table)
+- [x] Phase 10 — Edge cases (covers BRIEF §6.7 table)
 - [ ] Phase 11 — Description note, about page and site metadata (covers BRIEF §6.6 Description note, §6.9 about.qmd, _quarto.yml)
 
 ## Later / maybe
