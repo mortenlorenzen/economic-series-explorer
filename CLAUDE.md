@@ -2,8 +2,8 @@
 
 ## Commands
 <!-- How to check work. The constitution fills these in. The Stop hook runs the Test command; `none` or a <placeholder> disables it. -->
-- Test: `<command>`
-- Lint/typecheck: `<command>`
+- Test: `./run-tests.sh`
+- Lint/typecheck: `none`
 
 ## Specs
 This project uses spec-driven development.
