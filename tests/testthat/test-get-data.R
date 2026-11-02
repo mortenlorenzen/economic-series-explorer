@@ -17,7 +17,26 @@ test_that("read_registry stops on missing or extra columns", {
 
 test_that("the real series.csv is a valid registry", {
   reg <- read_registry(test_path("..", "..", "series.csv"))
-  expect_true("sp500" %in% reg$id)
+  expect_equal(reg$id, c(
+    "sp500", "djia", "nasdaq", "dxy", "gdp", "housing", "inflation",
+    "unemployment", "labor_participation", "treasury10yr", "debt_gdp"
+  ))
+})
+
+test_that("validate_registry reports every problem with its row", {
+  err <- tryCatch(read_registry(fixture("registry_invalid.csv")), error = conditionMessage)
+  expected <- c(
+    "row 2 (good): duplicate id",
+    "row 3 (Bad Id): id must be lowercase",
+    "row 4 (src): unknown source 'bloomberg'",
+    "row 5 (knd): unknown kind 'ratio'",
+    "row 6 (trf): unknown transform 'cube'",
+    "row 7 (stl): max_stale_days must be a number above 0",
+    "row 8 (zer): max_stale_days must be a number above 0",
+    "row 9 (nam): name is empty"
+  )
+  for (e in expected) expect_match(err, e, fixed = TRUE)
+  expect_false(grepl("row 1 ", err, fixed = TRUE))
 })
 
 test_that("clean_series drops NA and duplicate dates and sorts", {
@@ -33,11 +52,11 @@ test_that("clean_series stops when nothing is left", {
 
 test_that("unsupported source and transform stop with the series id", {
   row <- read_registry(fixture("registry.csv"))[1, ]
-  row$source <- "fred"
-  expect_error(fetch_series(row), "sp500: unsupported source 'fred'")
+  row$source <- "bloomberg"
+  expect_error(fetch_series(row), "sp500: unsupported source 'bloomberg'")
   row <- read_registry(fixture("registry.csv"))[1, ]
-  row$transform <- "yoy"
-  expect_error(apply_transform(data.frame(), row), "sp500: unknown transform 'yoy'")
+  row$transform <- "cube"
+  expect_error(apply_transform(data.frame(), row), "sp500: unknown transform 'cube'")
 })
 
 test_that("write_data writes the per-series file and the index", {
@@ -78,4 +97,157 @@ test_that("a single observation is still written as arrays", {
   json <- readLines(file.path(dir, "sp500.json"))
   expect_match(json, '"dates":["2020-01-02"]', fixed = TRUE)
   expect_match(json, '"values":[1.5]', fixed = TRUE)
+})
+
+test_that("parse_fred_csv reads dates and values, blank as NA", {
+  text <- paste(readLines(fixture("fred_dgs10.csv")), collapse = "\n")
+  df <- parse_fred_csv(text, "DGS10")
+  expect_s3_class(df$date, "Date")
+  expect_equal(format(df$date), c("1962-01-04", "1962-01-02", "1962-02-12", "1962-01-03"))
+  expect_equal(df$value, c(3.99, 4.06, NA, 4.03))
+  expect_equal(nrow(clean_series(df, "treasury10yr")), 3)
+})
+
+test_that("parse_fred_csv stops on a header for another symbol", {
+  expect_error(parse_fred_csv("observation_date,UNRATE\n1948-01-01,3.4", "DGS10"),
+               "FRED CSV for DGS10 has columns observation_date, UNRATE")
+})
+
+test_that("with_retry succeeds after transient failures", {
+  calls <- 0
+  f <- function() {
+    calls <<- calls + 1
+    if (calls < 3) stop("timeout")
+    "ok"
+  }
+  expect_equal(with_retry(f, "x", wait = 0), "ok")
+  expect_equal(calls, 3)
+})
+
+test_that("with_retry gives up after three tries with the id and last error", {
+  calls <- 0
+  f <- function() {
+    calls <<- calls + 1
+    stop("HTTP 503")
+  }
+  expect_error(with_retry(f, "gdp", wait = 0), "gdp: fetch failed after 3 tries: HTTP 503")
+  expect_equal(calls, 3)
+})
+
+cpi_fixture <- function() {
+  text <- paste(readLines(fixture("fred_cpiaucsl.csv")), collapse = "\n")
+  clean_series(parse_fred_csv(text, "CPIAUCSL"), "inflation")
+}
+
+test_that("transform none passes the data through", {
+  df <- cpi_fixture()
+  row <- list(id = "x", transform = "none")
+  expect_identical(apply_transform(df, row), df)
+})
+
+test_that("yoy on monthly data starts a year later, in percent", {
+  df <- cpi_fixture()
+  expect_equal(nrow(df), 25)
+  out <- apply_transform(df, list(id = "inflation", transform = "yoy"))
+  expect_equal(nrow(out), 13)
+  expect_equal(out$date[1], as.Date("2024-01-01"))
+  expect_equal(out$date[13], as.Date("2025-01-01"))
+  expect_equal(out$value[1], 100 * (df$value[13] / df$value[1] - 1))
+  expect_equal(out$value[13], 100 * (df$value[25] / df$value[13] - 1))
+})
+
+test_that("yoy drops dates without an observation one year earlier", {
+  df <- data.frame(
+    date = as.Date(c("2020-01-01", "2020-03-01", "2021-01-01", "2021-02-01", "2021-03-01")),
+    value = c(100, 200, 110, 120, 210)
+  )
+  out <- yoy(df)
+  expect_equal(format(out$date), c("2021-01-01", "2021-03-01"))
+  expect_equal(out$value, c(10, 5))
+})
+
+test_that("yoy handles a series that starts on 29 February", {
+  df <- data.frame(date = as.Date(c("2024-02-29", "2024-03-01", "2025-03-01")),
+                   value = c(1, 2, 3))
+  out <- yoy(df)
+  expect_equal(format(out$date), "2025-03-01")
+  expect_equal(out$value, 50)
+})
+
+test_that("yoy drops 29 February, which has no date a year earlier", {
+  df <- data.frame(date = as.Date(c("2023-02-28", "2024-02-28", "2024-02-29")),
+                   value = c(100, 102, 103))
+  expect_equal(format(yoy(df)$date), "2024-02-28")
+})
+
+test_that("check_staleness passes, warns, then fails at twice the limit", {
+  row <- list(id = "gdp", max_stale_days = 10)
+  df <- data.frame(date = as.Date("2026-01-01"), value = 1)
+  expect_silent(check_staleness(row, df, as.Date("2026-01-11")))
+  expect_warning(check_staleness(row, df, as.Date("2026-01-12")),
+                 "gdp: last observation is 11 days old")
+  expect_warning(check_staleness(row, df, as.Date("2026-01-21")), "20 days old")
+  expect_error(check_staleness(row, df, as.Date("2026-01-22")),
+               "gdp: last observation is 21 days old \\(fails above 20\\)")
+})
+
+test_that("check_regression fails on fewer observations than published", {
+  dir <- withr::local_tempdir()
+  writeLines('{"id":"sp500","n":10}', file.path(dir, "sp500.json"))
+  expect_error(check_regression("sp500", 9, dir),
+               "sp500: 9 observations, published file has 10")
+  expect_silent(check_regression("sp500", 10, dir))
+  expect_silent(check_regression("sp500", 11, dir))
+  expect_silent(check_regression("new_series", 1, dir))
+})
+
+pipeline_registry <- function() {
+  data.frame(
+    id = c("a", "b"), name = c("A", "B"), category = "Markets", source = "yahoo",
+    symbol = c("A", "B"), kind = "level", transform = "none", unit = "Index points",
+    max_stale_days = 7, description = "Test."
+  )
+}
+
+fake_fetch <- function(row) {
+  if (row$symbol == "B-broken") stop("HTTP 404")
+  data.frame(date = as.Date(c("2026-01-01", "2026-01-02")), value = c(1, 2))
+}
+
+test_that("run_pipeline writes every series when all succeed", {
+  dir <- withr::local_tempdir()
+  run_pipeline(pipeline_registry(), fake_fetch, dir, today = as.Date("2026-01-03"))
+  expect_setequal(list.files(dir), c("a.json", "b.json", "series.json"))
+})
+
+test_that("run_pipeline writes nothing when one series fails, and names it", {
+  dir <- withr::local_tempdir()
+  run_pipeline(pipeline_registry(), fake_fetch, dir, today = as.Date("2026-01-03"))
+  before <- tools::md5sum(list.files(dir, full.names = TRUE))
+
+  reg <- pipeline_registry()
+  reg$symbol[2] <- "B-broken"
+  err <- tryCatch(
+    run_pipeline(reg, fake_fetch, dir, today = as.Date("2026-01-03")),
+    error = conditionMessage
+  )
+  expect_match(err, "1 of 2 series failed, nothing written")
+  expect_match(err, "b: HTTP 404", fixed = TRUE)
+  expect_false(grepl("\na:", err))
+  expect_equal(tools::md5sum(list.files(dir, full.names = TRUE)), before)
+})
+
+test_that("run_pipeline names every failed series, without doubling ids", {
+  dir <- withr::local_tempdir()
+  reg <- pipeline_registry()
+  reg$symbol[2] <- "B-broken"
+  err <- tryCatch(
+    run_pipeline(reg, fake_fetch, dir, today = as.Date("2026-03-01")),
+    error = conditionMessage
+  )
+  expect_match(err, "2 of 2 series failed, nothing written")
+  expect_match(err, "\na: last observation is 58 days old")
+  expect_match(err, "\nb: HTTP 404")
+  expect_false(grepl("a: a:", err, fixed = TRUE))
+  expect_length(list.files(dir), 0)
 })

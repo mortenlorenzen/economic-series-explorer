@@ -1,2 +1,12 @@
 id,name,category,source,symbol,kind,transform,unit,max_stale_days,description
 sp500,S&P 500,Markets,yahoo,^GSPC,level,none,Index points,7,"Stock market index of 500 large US companies, weighted by market value. Daily adjusted close from Yahoo Finance."
+djia,Dow Jones,Markets,yahoo,^DJI,level,none,Index points,7,"Price-weighted stock market index of 30 large US companies. Daily adjusted close from Yahoo Finance."
+nasdaq,NASDAQ,Markets,yahoo,^IXIC,level,none,Index points,7,"Index of the stocks listed on the Nasdaq exchange, weighted by market value. Daily adjusted close from Yahoo Finance."
+dxy,US Dollar Index,Markets,yahoo,DX-Y.NYB,level,none,Index points,7,"Value of the US dollar against a weighted basket of six major currencies. Daily adjusted close from Yahoo Finance."
+gdp,Real GDP,Output,fred,GDPC1,level,none,Billions of chained 2017 dollars,200,"Total output of the US economy, adjusted for inflation, at a seasonally adjusted annual rate. Quarterly, from the Bureau of Economic Analysis via FRED."
+housing,Home Price Index,Prices,fred,CSUSHPISA,level,none,"Index, Jan 2000 = 100",130,"Repeat-sales index of US single-family home prices, seasonally adjusted. Monthly, from S&P Dow Jones Indices via FRED."
+inflation,Inflation Rate,Prices,fred,CPIAUCSL,rate,yoy,"Percent, year over year",90,"Change in consumer prices over the previous 12 months, from the seasonally adjusted Consumer Price Index for all urban consumers. Monthly, from the Bureau of Labor Statistics via FRED."
+unemployment,Unemployment Rate,Labour,fred,UNRATE,rate,none,Percent,70,"Share of the labor force that is jobless and looking for work, seasonally adjusted. Monthly, from the Bureau of Labor Statistics via FRED."
+labor_participation,Labor Force Participation,Labour,fred,CIVPART,rate,none,Percent,70,"Share of the civilian population aged 16 and over that is working or looking for work, seasonally adjusted. Monthly, from the Bureau of Labor Statistics via FRED."
+treasury10yr,10-Year Treasury Yield,Rates,fred,DGS10,rate,none,Percent,10,"Market yield on US Treasury securities with 10 years to maturity. Daily, from the Federal Reserve via FRED."
+debt_gdp,Federal Debt to GDP,Fiscal,fred,GFDEGDQ188S,rate,none,Percent of GDP,300,"Total public debt of the US federal government as a share of GDP, seasonally adjusted. Quarterly, from the Office of Management and Budget and the St. Louis Fed via FRED."
