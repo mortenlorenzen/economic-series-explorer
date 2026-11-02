@@ -168,17 +168,61 @@ write_data <- function(series, dir = "data") {
   write_json_file(meta, file.path(dir, "series.json"))
 }
 
-main <- function() {
-  reg <- read_registry()
-  series <- lapply(seq_len(nrow(reg)), function(i) {
-    row <- reg[i, ]
-    df <- clean_series(fetch_series(row), row$id)
-    df <- apply_transform(df, row)
-    message(row$id, ": ", nrow(df), " observations, ", df$date[1], " to ",
-            df$date[nrow(df)])
-    series_json(row, df)
+# Warns when the last observation is older than max_stale_days, fails when
+# it is older than twice that.
+check_staleness <- function(row, df, today) {
+  age <- as.numeric(today - df$date[nrow(df)])
+  if (age > 2 * row$max_stale_days) {
+    stop(row$id, ": last observation is ", age, " days old (fails above ",
+         2 * row$max_stale_days, ")", call. = FALSE)
+  }
+  if (age > row$max_stale_days) {
+    warning(row$id, ": last observation is ", age, " days old (warns above ",
+            row$max_stale_days, ")", call. = FALSE)
+  }
+  invisible(age)
+}
+
+# Fails when the new data has fewer observations than the published file.
+check_regression <- function(id, n, dir = "data") {
+  path <- file.path(dir, paste0(id, ".json"))
+  if (!file.exists(path)) return(invisible(TRUE))
+  published <- jsonlite::read_json(path)$n
+  if (n < published) {
+    stop(id, ": ", n, " observations, published file has ", published, call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
+build_series <- function(row, fetch, dir, today) {
+  df <- clean_series(fetch(row), row$id)
+  df <- apply_transform(df, row)
+  if (nrow(df) == 0) stop(row$id, ": no observations after transform", call. = FALSE)
+  check_staleness(row, df, today)
+  check_regression(row$id, nrow(df), dir)
+  message(row$id, ": ", nrow(df), " observations, ", df$date[1], " to ",
+          df$date[nrow(df)])
+  series_json(row, df)
+}
+
+# Builds every series, collecting errors so one run reports every broken
+# series; writes only when all succeed.
+run_pipeline <- function(reg, fetch = fetch_series, dir = "data",
+                         today = as.Date(format(Sys.time(), tz = "UTC"))) {
+  results <- lapply(seq_len(nrow(reg)), function(i) {
+    tryCatch(build_series(reg[i, ], fetch, dir, today), error = function(e) e)
   })
-  write_data(series)
+  failed <- vapply(results, inherits, logical(1), "error")
+  if (any(failed)) {
+    msgs <- vapply(results[failed], conditionMessage, character(1))
+    stop(sum(failed), " of ", nrow(reg), " series failed, nothing written:\n",
+         paste(msgs, collapse = "\n"), call. = FALSE)
+  }
+  write_data(results, dir)
+}
+
+main <- function() {
+  run_pipeline(read_registry())
 }
 
 if (sys.nframe() == 0) main()

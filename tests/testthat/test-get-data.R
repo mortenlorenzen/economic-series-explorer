@@ -168,3 +168,60 @@ test_that("yoy drops 29 February, which has no date a year earlier", {
                    value = c(100, 102, 103))
   expect_equal(format(yoy(df)$date), "2024-02-28")
 })
+
+test_that("check_staleness passes, warns, then fails at twice the limit", {
+  row <- list(id = "gdp", max_stale_days = 10)
+  df <- data.frame(date = as.Date("2026-01-01"), value = 1)
+  expect_silent(check_staleness(row, df, as.Date("2026-01-11")))
+  expect_warning(check_staleness(row, df, as.Date("2026-01-12")),
+                 "gdp: last observation is 11 days old")
+  expect_warning(check_staleness(row, df, as.Date("2026-01-21")), "20 days old")
+  expect_error(check_staleness(row, df, as.Date("2026-01-22")),
+               "gdp: last observation is 21 days old \\(fails above 20\\)")
+})
+
+test_that("check_regression fails on fewer observations than published", {
+  dir <- withr::local_tempdir()
+  writeLines('{"id":"sp500","n":10}', file.path(dir, "sp500.json"))
+  expect_error(check_regression("sp500", 9, dir),
+               "sp500: 9 observations, published file has 10")
+  expect_silent(check_regression("sp500", 10, dir))
+  expect_silent(check_regression("sp500", 11, dir))
+  expect_silent(check_regression("new_series", 1, dir))
+})
+
+pipeline_registry <- function() {
+  data.frame(
+    id = c("a", "b"), name = c("A", "B"), category = "Markets", source = "yahoo",
+    symbol = c("A", "B"), kind = "level", transform = "none", unit = "Index points",
+    max_stale_days = 7, description = "Test."
+  )
+}
+
+fake_fetch <- function(row) {
+  if (row$symbol == "B-broken") stop("HTTP 404")
+  data.frame(date = as.Date(c("2026-01-01", "2026-01-02")), value = c(1, 2))
+}
+
+test_that("run_pipeline writes every series when all succeed", {
+  dir <- withr::local_tempdir()
+  run_pipeline(pipeline_registry(), fake_fetch, dir, today = as.Date("2026-01-03"))
+  expect_setequal(list.files(dir), c("a.json", "b.json", "series.json"))
+})
+
+test_that("run_pipeline writes nothing and names every failed series", {
+  dir <- withr::local_tempdir()
+  run_pipeline(pipeline_registry(), fake_fetch, dir, today = as.Date("2026-01-03"))
+  before <- tools::md5sum(list.files(dir, full.names = TRUE))
+
+  reg <- pipeline_registry()
+  reg$symbol[2] <- "B-broken"
+  err <- tryCatch(
+    run_pipeline(reg, fake_fetch, dir, today = as.Date("2026-03-01")),
+    error = conditionMessage
+  )
+  expect_match(err, "2 of 2 series failed, nothing written")
+  expect_match(err, "a: last observation is 58 days old", fixed = TRUE)
+  expect_match(err, "HTTP 404", fixed = TRUE)
+  expect_equal(tools::md5sum(list.files(dir, full.names = TRUE)), before)
+})
