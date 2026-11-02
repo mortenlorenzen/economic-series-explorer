@@ -8,7 +8,15 @@ A personal project, built to explore growth scenarios and have quick access to t
 
 ## What it does
 
-- Eleven series: S&P 500, Dow Jones, NASDAQ, US Dollar Index, Real GDP, Home Price Index, Inflation Rate, Unemployment Rate, Labor Force Participation, 10-Year Treasury Yield and Federal Debt to GDP.
+- Twenty series:
+  - Markets: S&P 500, Dow Jones, NASDAQ, Hang Seng, CSI 300 China Tracker, MSCI AC World ETF, US Dollar Index
+  - Commodities: Gold, Crude Oil (WTI), Copper
+  - Crypto: Bitcoin
+  - Output: Real GDP
+  - Prices: Home Price Index, Inflation Rate, Consumer Prices Denmark
+  - Labour: Unemployment Rate, Labor Force Participation
+  - Rates: Federal Funds Rate, 10-Year Treasury Yield
+  - Fiscal: Federal Debt to GDP
 - Up to 8 series at once on a shared date axis. Level series are indexed to 100 on the start date. Rate series are shown as the change in percentage points, in a second panel.
 - A single series as actual values, on a linear or log scale.
 - Presets (1Y–Max) or a two-handle slider for the window. Windows over 10 years draw daily series as weekly averages, but indexing and export always use the full data.

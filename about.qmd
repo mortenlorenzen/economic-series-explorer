@@ -18,7 +18,7 @@ This is a personal project I built to explore growth scenarios and have quick ac
 
 ## Sources
 
-Market indices and the dollar index are adjusted closes from [Yahoo Finance](https://finance.yahoo.com/). All other series come from [FRED](https://fred.stlouisfed.org/), Federal Reserve Bank of St. Louis.
+Stock indices, ETFs, the dollar index and gold are daily closes from [Yahoo Finance](https://finance.yahoo.com/), adjusted for dividends and splits where Yahoo provides it; gold is the front-month futures price. All other series come from [FRED](https://fred.stlouisfed.org/), Federal Reserve Bank of St. Louis, which republishes data from sources such as the BLS, BEA, EIA, IMF, Eurostat and Coinbase.
 
 ```{ojs}
 //| echo: false
