@@ -10,7 +10,7 @@ import {
   exportRows, toCsv, exportFileName, todayLocal,
   sourceCaption, exportLayout, EXPORT_TEXT, wrapText, parseFontFaces, pickFontFaces,
   checkSeries, fetchSeries, loadAll, failureMessage,
-  descriptionNote,
+  descriptionNote, sliderBounds, dateToStep, stepToDate,
 } from "../../js/series.js";
 
 test("level is indexed to 100 at the anchor", () => {
@@ -537,4 +537,17 @@ test("descriptionNote: more than two collapse with the names in the summary", ()
   assert.equal(three.collapsed, true);
   assert.equal(three.summary, "About the series: S&P 500, NASDAQ, Unemployment Rate");
   assert.equal(three.lines.length, 3);
+});
+
+test("slider steps are days from the earliest first_date", () => {
+  const reg = [{ first_date: "1948-01-01", last_date: "2026-09-01" }, { first_date: "1927-12-30", last_date: "2026-10-30" }];
+  const b = sliderBounds(reg);
+  assert.equal(b.min, "1927-12-30");
+  assert.equal(b.max, "2026-10-30");
+  assert.equal(stepToDate(0, b.min), "1927-12-30");
+  assert.equal(stepToDate(2, b.min), "1928-01-01");
+  assert.equal(stepToDate(b.steps, b.min), "2026-10-30");
+  for (const d of ["1927-12-30", "2000-02-29", "2016-10-30", "2026-10-30"]) {
+    assert.equal(stepToDate(dateToStep(d, b.min), b.min), d);
+  }
 });

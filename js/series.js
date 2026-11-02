@@ -507,3 +507,19 @@ export function descriptionNote(selected) {
   if (selected.length <= 2) return { collapsed: false, summary: null, lines };
   return { collapsed: true, summary: `About the series: ${selected.map((s) => s.name).join(", ")}`, lines };
 }
+
+// Date slider: one step per day from the earliest first_date to the latest
+// last_date in the registry.
+export function sliderBounds(registry) {
+  const min = registry.map((s) => s.first_date).reduce((a, b) => (b < a ? b : a));
+  const max = registry.map((s) => s.last_date).reduce((a, b) => (b > a ? b : a));
+  return { min, max, steps: dateToStep(max, min) };
+}
+
+export function dateToStep(date, min) {
+  return Math.round(daysBetween(min, date));
+}
+
+export function stepToDate(step, min) {
+  return new Date(Date.parse(`${min}T00:00:00Z`) + step * DAY_MS).toISOString().slice(0, 10);
+}

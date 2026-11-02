@@ -15,7 +15,8 @@ import {
   displayMode, DISPLAY_REASON, logScale, actualPoints, actualSubtitle, actualAxis,
   createLoader, isDaily, windowOverTenYears, downsampleWeekly,
   exportRows, toCsv, exportFileName, todayLocal, sourceCaption, exportLayout, EXPORT_TEXT, wrapText,
-  parseFontFaces, pickFontFaces, fetchSeries, loadAll, failureMessage, descriptionNote
+  parseFontFaces, pickFontFaces, fetchSeries, loadAll, failureMessage, descriptionNote,
+  sliderBounds, dateToStep, stepToDate
 } from "./js/series.js"
 
 registry = (await fetch("data/series.json")).json()
@@ -32,12 +33,29 @@ DEFAULT_SELECTION = ["sp500", "nasdaq"]
 DEFAULT_PRESET = "10Y"
 ```
 
-::: {.panel-sidebar}
+::: {.controls-bar}
 
 ```{ojs}
 //| echo: false
+// A dropdown button over the grouped checkboxes; closes on an outside click
+// or Escape.
 viewof selected = {
-  const form = html`<div class="picker"></div>`;
+  const form = html`<div class="series-dropdown"></div>`;
+  const toggle = html`<button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" aria-expanded="false"></button>`;
+  const panel = html`<div class="picker" hidden></div>`;
+  const open = (yes) => {
+    panel.hidden = !yes;
+    toggle.setAttribute("aria-expanded", String(yes));
+  };
+  toggle.onclick = () => open(panel.hidden);
+  const outside = (e) => { if (!form.contains(e.target)) open(false); };
+  const escape = (e) => { if (e.key === "Escape") open(false); };
+  document.addEventListener("click", outside);
+  document.addEventListener("keydown", escape);
+  invalidation.then(() => {
+    document.removeEventListener("click", outside);
+    document.removeEventListener("keydown", escape);
+  });
   form.value = DEFAULT_SELECTION.filter((id) => pickable.some((s) => s.id === id));
   const boxes = new Map();
   const update = () => {
@@ -45,6 +63,7 @@ viewof selected = {
       box.checked = form.value.includes(id);
       box.disabled = !canSelect(form.value, id);
     }
+    toggle.textContent = `Series (${form.value.length})`;
   };
   const emit = () => {
     update();
@@ -63,14 +82,15 @@ viewof selected = {
       boxes.set(s.id, box);
       group.append(html`<label class="picker-item">${box} ${s.name}</label>`);
     }
-    form.append(group);
+    panel.append(group);
   }
   const clear = html`<button type="button" class="btn btn-sm btn-outline-secondary">Deselect All</button>`;
   clear.onclick = () => {
     form.value = [];
     emit();
   };
-  form.append(clear);
+  panel.append(clear);
+  form.append(toggle, panel);
   update();
   return form;
 }
@@ -78,16 +98,27 @@ viewof selected = {
 
 ```{ojs}
 //| echo: false
+// Presets plus a two-handle slider over every day in the registry. Dragging
+// updates the dates shown; releasing a handle redraws the chart.
 viewof range = {
-  const form = html`<div class="range"><div class="range-label">Date range</div></div>`;
+  const { min, steps } = sliderBounds(registry);
+  const form = html`<div class="range"><span class="control-label">Date range</span></div>`;
   const buttons = new Map();
   const bar = html`<div class="btn-group btn-group-sm" role="group"></div>`;
-  const from = html`<input type="date" class="form-control form-control-sm">`;
-  const to = html`<input type="date" class="form-control form-control-sm">`;
+  const handle = (label) => html`<input type="range" min="0" max=${steps} step="1" aria-label=${label}>`;
+  const lo = handle("From");
+  const hi = handle("To");
+  const dates = html`<span class="range-dates"></span>`;
+  const show = () => {
+    dates.textContent = `${stepToDate(+lo.value, min)} – ${stepToDate(+hi.value, min)}`;
+    // Both handles at one end: the one that can move away goes on top.
+    lo.style.zIndex = +lo.value > steps / 2 ? 3 : 1;
+  };
   const set = (value) => {
     form.value = value;
-    from.value = value.from;
-    to.value = value.to;
+    lo.value = dateToStep(value.from, min);
+    hi.value = dateToStep(value.to, min);
+    show();
     for (const [p, b] of buttons) b.classList.toggle("active", p === value.preset);
   };
   const emit = () => form.dispatchEvent(new Event("input", { bubbles: true }));
@@ -100,22 +131,22 @@ viewof range = {
     buttons.set(preset, b);
     bar.append(b);
   }
-  const edited = () => {
-    // A cleared input goes back to the date the chart is drawn from.
-    if (!from.value || !to.value) {
-      set(form.value);
-      return;
-    }
-    set({ from: from.value, to: to.value, preset: null });
+  // Handles can't cross.
+  lo.oninput = () => {
+    if (+lo.value > +hi.value) lo.value = hi.value;
+    show();
+  };
+  hi.oninput = () => {
+    if (+hi.value < +lo.value) hi.value = lo.value;
+    show();
+  };
+  const released = () => {
+    set({ from: stepToDate(+lo.value, min), to: stepToDate(+hi.value, min), preset: null });
     emit();
   };
-  from.onchange = edited;
-  to.onchange = edited;
-  form.append(
-    bar,
-    html`<label class="range-input">From ${from}</label>`,
-    html`<label class="range-input">To ${to}</label>`
-  );
+  lo.onchange = released;
+  hi.onchange = released;
+  form.append(bar, html`<div class="dual-range">${lo}${hi}</div>`, dates);
   set({ ...presetRange(DEFAULT_PRESET, registry), preset: DEFAULT_PRESET });
   return form;
 }
@@ -202,8 +233,6 @@ viewof scaleChoice.setState(!logState.allowed, logState.reason, "linear")
 ```
 
 :::
-
-::: {.panel-fill}
 
 ```{ojs}
 //| echo: false
@@ -396,7 +425,6 @@ function drawPanel(list, { label, reference, zeroFloor = false, type, labelKind,
 }
 ```
 
-:::
 
 ```{ojs}
 //| echo: false
@@ -546,19 +574,39 @@ async function inlineFonts(family, weights) {
 
 ```{=html}
 <style>
+/* Full width: the explorer spans the whole screen, not Quarto's page column. */
+main.content.column-page, #title-block-header { grid-column: screen-start-inset / screen-end-inset; }
+.controls-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.5rem; margin-bottom: 1rem; }
+.controls-bar > * { margin: 0; }
+.controls-bar .cell, .controls-bar .cell-output-display { display: flex; align-items: center; gap: 0.5rem 1.5rem; flex-wrap: wrap; overflow: visible; }
+.controls-bar .cell-output-display:empty, .controls-bar .cell:has(.cell-output-display:empty) { display: none; }
+.control-label, .controls-bar legend { font-size: 0.85rem; font-weight: 600; margin: 0 0.5rem 0 0; }
+.series-dropdown { position: relative; }
+.series-dropdown .picker { position: absolute; z-index: 1000; top: calc(100% + 4px); left: 0; min-width: 16rem;
+  padding: 0.75rem; background: var(--bs-body-bg, #fff); border: 1px solid var(--bs-border-color, #dee2e6);
+  border-radius: 0.375rem; box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15); }
 .picker-group { margin-bottom: 0.75rem; }
-.picker-group legend { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; }
-.picker-item { display: block; font-size: 0.9rem; }
-.picker-item input:disabled + * , .picker-item:has(input:disabled) { opacity: 0.5; }
-.range { margin-top: 1rem; }
-.range-label { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; }
-.range-input { display: block; font-size: 0.85rem; margin-top: 0.5rem; }
-.radio-group { margin-top: 1rem; }
-.radio-group legend { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; }
-.radio-item { display: block; font-size: 0.9rem; }
+.picker-group legend { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; float: none; width: auto; }
+.picker-item { display: block; font-size: 0.9rem; white-space: nowrap; }
+.picker-item:has(input:disabled) { opacity: 0.5; }
+.range { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.range-dates { font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.dual-range { position: relative; width: 16rem; height: 1.5rem; }
+.dual-range input[type=range] { position: absolute; inset: 0; width: 100%; margin: 0; background: none;
+  pointer-events: none; -webkit-appearance: none; appearance: none; z-index: 2; }
+.dual-range::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 4px; margin-top: -2px;
+  background: var(--bs-border-color, #dee2e6); border-radius: 2px; }
+.dual-range input[type=range]::-webkit-slider-thumb { pointer-events: auto; -webkit-appearance: none; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--bs-primary, #2780e3); border: 2px solid #fff; cursor: pointer; }
+.dual-range input[type=range]::-moz-range-thumb { pointer-events: auto; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--bs-primary, #2780e3); border: 2px solid #fff; cursor: pointer; }
+.dual-range input[type=range]::-moz-range-track { background: none; }
+.dual-range input[type=range]:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--bs-primary, #2780e3); outline-offset: 2px; }
+.radio-group { display: flex; align-items: center; gap: 0.75rem; margin: 0; }
+.radio-group legend, .export-group legend { float: left; width: auto; padding: 0; margin-bottom: 0; }
+.radio-item { font-size: 0.9rem; white-space: nowrap; }
 .radio-group.disabled { opacity: 0.5; }
-.export-group { margin-top: 1rem; }
-.export-group legend { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; }
+.export-group { display: flex; align-items: center; gap: 0.25rem; margin: 0; }
 .chart-title { font-size: 1.25rem; margin: 0; }
 .chart-subtitle { color: var(--bs-secondary-color, #6c757d); margin: 0 0 0.5rem; }
 .chart-note { font-size: 0.85rem; color: var(--bs-secondary-color, #6c757d); }
