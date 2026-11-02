@@ -56,6 +56,10 @@
 - WHEN the same series is written
 - THEN `series.json` is an array with one object holding the metadata and no `dates` or `values`
 
+#### Scenario: single observation
+- WHEN a series has one observation
+- THEN `dates` and `values` are still JSON arrays of length 1
+
 ### Requirement: Unsupported settings stop the run
 #### Scenario: unknown source or transform
 - WHEN a registry row has `source` other than `yahoo` or `transform` other than `none`

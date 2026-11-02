@@ -60,7 +60,7 @@ series_json <- function(row, df) {
     source = row$source, symbol = row$symbol, kind = row$kind,
     unit = row$unit, description = row$description,
     first_date = dates[1], last_date = dates[length(dates)], n = nrow(df),
-    dates = dates, values = df$value
+    dates = I(dates), values = I(df$value)
   )
 }
 

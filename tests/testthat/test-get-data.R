@@ -69,3 +69,13 @@ test_that("values are written with 7 significant digits", {
   write_json_file(list(values = c(7744.0601, 17.66, 0.123456789)), path)
   expect_equal(readLines(path), '{"values":[7744.06,17.66,0.1234568]}')
 })
+
+test_that("a single observation is still written as arrays", {
+  row <- read_registry(fixture("registry.csv"))[1, ]
+  df <- data.frame(date = as.Date("2020-01-02"), value = 1.5)
+  dir <- withr::local_tempdir()
+  write_data(list(series_json(row, df)), dir)
+  json <- readLines(file.path(dir, "sp500.json"))
+  expect_match(json, '"dates":["2020-01-02"]', fixed = TRUE)
+  expect_match(json, '"values":[1.5]', fixed = TRUE)
+})
