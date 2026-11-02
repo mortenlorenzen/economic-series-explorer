@@ -327,7 +327,7 @@ function actualChart() {
 // One chart panel. Panels share the width and left/right margins so dates
 // line up; only the bottom one shows x ticks. `reference` null = no line.
 function drawPanel(list, { label, reference, zeroFloor = false, type, labelKind, tipName, tipFormat, xDomain, height, showXAxis }) {
-  const marginTop = 12;
+  const marginTop = 22;
   const marginBottom = showXAxis ? 30 : 8;
   const marginLeft = 56;
   const marginRight = 170;
