@@ -13,7 +13,7 @@ import {
   PANELS, panelHeights, shownKinds, chartSubtitle,
   displayMode, DISPLAY_REASON, logScale, actualPoints, actualSubtitle, actualAxis,
   createLoader, isDaily, windowOverTenYears, downsampleWeekly,
-  exportRows, toCsv, exportFileName, todayLocal, sourceCaption, exportLayout, EXPORT_TEXT,
+  exportRows, toCsv, exportFileName, todayLocal, sourceCaption, exportLayout, EXPORT_TEXT, wrapText,
   parseFontFaces, pickFontFaces
 } from "./js/series.js"
 
@@ -190,6 +190,8 @@ viewof scaleChoice.setState(!logState.allowed, logState.reason, "linear")
     try {
       const caption = sourceCaption(exported.list.map((d) => d.series.source));
       download(await chartPng(chart, caption), name("png"));
+    } catch (error) {
+      png.title = `PNG export failed: ${error.message}`;
     } finally {
       png.disabled = false;
     }
@@ -400,14 +402,29 @@ async function chartPng(el, caption) {
   const titleEl = el.querySelector(".chart-title");
   const subtitleEl = el.querySelector(".chart-subtitle");
   const noteEl = el.querySelector(".chart-note");
-  const layout = exportLayout(heights, { note: !!noteEl });
   const W = width + 2 * pad;
-  const H = layout.height;
 
   const titleStyle = getComputedStyle(titleEl);
   const family = titleStyle.fontFamily.split(",")[0].trim().replace(/^['"]|['"]$/g, "");
   const textWeight = Number(getComputedStyle(el).fontWeight);
   const titleWeight = Number(titleStyle.fontWeight);
+  const fontCss = await inlineFonts(family, [textWeight, titleWeight]);
+
+  // Wrap each text block to the chart width, measured in the page's font
+  // (loaded on the page, so the canvas measures what the PNG draws).
+  const ctx2d = document.createElement("canvas").getContext("2d");
+  const wrap = (content, spec, weight = textWeight) => {
+    ctx2d.font = `${weight} ${spec.size}px ${titleStyle.fontFamily}`;
+    return wrapText(content, width, (t) => ctx2d.measureText(t).width);
+  };
+  const blocks = {
+    title: wrap(titleEl.textContent.trim(), EXPORT_TEXT.title, titleWeight),
+    subtitle: wrap(subtitleEl.textContent.trim(), EXPORT_TEXT.subtitle),
+    note: noteEl ? wrap(noteEl.textContent.trim(), EXPORT_TEXT.note) : [],
+    caption: wrap(caption, EXPORT_TEXT.caption)
+  };
+  const layout = exportLayout(heights, Object.fromEntries(Object.entries(blocks).map(([k, v]) => [k, v.length])));
+  const H = layout.height;
 
   const svg = document.createElementNS(NS, "svg");
   svg.setAttribute("xmlns", NS);
@@ -416,22 +433,28 @@ async function chartPng(el, caption) {
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svg.setAttribute("style", `color: ${getComputedStyle(el).color}`);
   const style = document.createElementNS(NS, "style");
-  style.textContent = await inlineFonts(family, [textWeight, titleWeight]);
+  style.textContent = fontCss;
   svg.append(style);
   const bg = document.createElementNS(NS, "rect");
   for (const [k, v] of Object.entries({ width: W, height: H, fill: "white" })) bg.setAttribute(k, v);
   svg.append(bg);
-  const text = (content, y, spec, { weight = textWeight, fill = "currentColor" } = {}) => {
+  const text = (lines, y, spec, { weight = textWeight, fill = "currentColor" } = {}) => {
     const t = document.createElementNS(NS, "text");
     for (const [k, v] of Object.entries({
-      x: pad, y, fill, "font-size": spec.size, "font-weight": weight, "font-family": titleStyle.fontFamily
+      y, fill, "font-size": spec.size, "font-weight": weight, "font-family": titleStyle.fontFamily
     })) t.setAttribute(k, v);
-    t.textContent = content;
+    lines.forEach((line, i) => {
+      const span = document.createElementNS(NS, "tspan");
+      span.setAttribute("x", pad);
+      if (i) span.setAttribute("dy", spec.line);
+      span.textContent = line;
+      t.append(span);
+    });
     svg.append(t);
   };
   const muted = getComputedStyle(subtitleEl).color;
-  text(titleEl.textContent.trim(), layout.title, EXPORT_TEXT.title, { weight: titleWeight });
-  text(subtitleEl.textContent.trim(), layout.subtitle, EXPORT_TEXT.subtitle, { fill: muted });
+  text(blocks.title, layout.title, EXPORT_TEXT.title, { weight: titleWeight });
+  text(blocks.subtitle, layout.subtitle, EXPORT_TEXT.subtitle, { fill: muted });
   panels.forEach((panel, i) => {
     const clone = panel.cloneNode(true);
     clone.querySelectorAll('[aria-label="tip"]').forEach((n) => n.remove());
@@ -442,8 +465,8 @@ async function chartPng(el, caption) {
     clone.style.height = `${heights[i]}px`;
     svg.append(clone);
   });
-  if (noteEl) text(noteEl.textContent.trim(), layout.note, EXPORT_TEXT.note, { fill: muted });
-  text(caption, layout.caption, EXPORT_TEXT.caption, { fill: muted });
+  if (noteEl) text(blocks.note, layout.note, EXPORT_TEXT.note, { fill: muted });
+  text(blocks.caption, layout.caption, EXPORT_TEXT.caption, { fill: muted });
 
   const img = new Image();
   img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}`;

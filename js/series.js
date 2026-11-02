@@ -380,26 +380,46 @@ export const EXPORT_TEXT = {
   caption: { size: 12, line: 18 },
 };
 
-export function exportLayout(panelHeights, { note = false } = {}) {
-  const { pad, title, subtitle, note: noteText, caption } = EXPORT_TEXT;
+// `lines` gives each text block's line count after wrapping; note 0 = no note.
+// Each text value is the first line's baseline.
+export function exportLayout(panelHeights, { title = 1, subtitle = 1, note = 0, caption = 1 } = {}) {
+  const { pad } = EXPORT_TEXT;
   let y = pad;
-  const baseline = (t) => {
+  const block = (t, n) => {
     const b = y + t.line - (t.line - t.size) / 2 - Math.round(t.size * 0.2);
-    y += t.line;
+    y += t.line * n;
     return b;
   };
-  const out = { title: baseline(title), subtitle: baseline(subtitle) };
+  const out = { title: block(EXPORT_TEXT.title, title), subtitle: block(EXPORT_TEXT.subtitle, subtitle) };
   y += 4;
   out.panels = panelHeights.map((h) => {
     const top = y;
     y += h;
     return top;
   });
-  out.note = note ? baseline(noteText) : null;
+  out.note = note ? block(EXPORT_TEXT.note, note) : null;
   y += 4;
-  out.caption = baseline(caption);
+  out.caption = block(EXPORT_TEXT.caption, caption);
   out.height = y + pad;
   return out;
+}
+
+// Greedy word wrap: lines no wider than maxWidth by `measure(text)`; a single
+// word wider than that gets a line of its own.
+export function wrapText(text, maxWidth, measure) {
+  const lines = [];
+  let line = "";
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    const next = line ? `${line} ${word}` : word;
+    if (line && measure(next) > maxWidth) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = next;
+    }
+  }
+  if (line) lines.push(line);
+  return lines.length ? lines : [""];
 }
 
 // @font-face rules in a stylesheet's text, as {family, style, weight,

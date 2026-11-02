@@ -8,7 +8,7 @@ import {
   displayMode, logScale, actualPoints, formatActual, actualSubtitle, actualAxis,
   createLoader, isDaily, isoWeekKey, windowOverTenYears, downsampleWeekly,
   exportRows, toCsv, exportFileName, todayLocal,
-  sourceCaption, exportLayout, EXPORT_TEXT, parseFontFaces, pickFontFaces,
+  sourceCaption, exportLayout, EXPORT_TEXT, wrapText, parseFontFaces, pickFontFaces,
 } from "../../js/series.js";
 
 test("level is indexed to 100 at the anchor", () => {
@@ -424,10 +424,27 @@ test("exportLayout stacks panels at their heights between header and caption", (
   assert.equal(one.note, null);
   assert.ok(one.caption > one.panels[0] + 480);
   assert.ok(one.height > one.caption);
-  const two = exportLayout([288, 192], { note: true });
+  const two = exportLayout([288, 192], { note: 1 });
   assert.equal(two.panels[1], two.panels[0] + 288);
   assert.ok(two.note > two.panels[1] + 192 && two.caption > two.note);
   assert.equal(two.height - one.height, EXPORT_TEXT.note.line);
+});
+
+test("exportLayout makes room for wrapped lines", () => {
+  const one = exportLayout([480]);
+  const wrapped = exportLayout([480], { subtitle: 2, note: 3, caption: 2 });
+  assert.equal(wrapped.panels[0] - one.panels[0], EXPORT_TEXT.subtitle.line);
+  const noteTop = wrapped.panels[0] + 480;
+  assert.ok(wrapped.caption > noteTop + 3 * EXPORT_TEXT.note.line);
+  assert.equal(wrapped.height - one.height, EXPORT_TEXT.subtitle.line + 3 * EXPORT_TEXT.note.line + EXPORT_TEXT.caption.line);
+});
+
+test("wrapText breaks at words to fit the width", () => {
+  const measure = (t) => t.length * 10;
+  assert.deepEqual(wrapText("aaa bbb ccc dd", 75, measure), ["aaa bbb", "ccc dd"]);
+  assert.deepEqual(wrapText("short", 75, measure), ["short"]);
+  assert.deepEqual(wrapText("averyveryverylongword x", 75, measure), ["averyveryverylongword", "x"]);
+  assert.deepEqual(wrapText("", 75, measure), [""]);
 });
 
 const fontCss = readFileSync(new URL("../fixtures/google_fonts.css", import.meta.url), "utf8");
