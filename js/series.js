@@ -112,8 +112,12 @@ export function formatChange(plotted) {
   return `${rounded >= 0 ? "+" : ""}${rounded.toFixed(1)} pp`;
 }
 
+// kind: "level" or "rate" in indexed mode, "actual" in actual-values mode.
 export function formatEndLabel(name, plotted, kind = "level") {
-  return `${name} (${kind === "rate" ? formatChange(plotted) : plotted.toFixed(1)})`;
+  const text = kind === "rate" ? formatChange(plotted)
+    : kind === "actual" ? formatActual(plotted)
+    : plotted.toFixed(1);
+  return `${name} (${text})`;
 }
 
 // Panel settings by kind, in drawing order: levels on top, rates below.
@@ -156,16 +160,23 @@ export function panelHeights(kinds, total = PLOT_HEIGHT) {
   return {};
 }
 
-// Y domain covering the values and the reference line, padded 5% each side.
-export function yDomain(values, reference) {
-  let lo = reference;
-  let hi = reference;
-  for (const v of values) {
-    if (v < lo) lo = v;
-    if (v > hi) hi = v;
+// Y domain covering the values and the reference line (null for none),
+// padded 5% each side; on "log" the padding is in log10 space. With
+// `zeroFloor`, an all-non-negative domain starts exactly at 0.
+export function yDomain(values, reference, { type = "linear", zeroFloor = false } = {}) {
+  const log = type === "log";
+  const f = log ? Math.log10 : (v) => v;
+  const g = log ? (v) => 10 ** v : (v) => v;
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const v of reference === null ? values : [...values, reference]) {
+    const t = f(v);
+    if (t < lo) lo = t;
+    if (t > hi) hi = t;
   }
-  const pad = hi > lo ? (hi - lo) * 0.05 : 1;
-  return [lo - pad, hi + pad];
+  const pad = hi > lo ? (hi - lo) * 0.05 : log ? 0.05 : 1;
+  if (zeroFloor && !log && lo >= 0) return [0, hi + pad];
+  return [g(lo - pad), g(hi + pad)];
 }
 
 // Pushes pixel positions apart to at least `gap`, keeping their order and
@@ -184,12 +195,16 @@ export function declutter(positions, { top, bottom, gap }) {
   return out;
 }
 
-// Declutters label values on a linear y scale: values to pixels, apart,
-// and back to values, so Plot can draw them in data coordinates.
-export function declutterValues(values, domain, { top, bottom, gap }) {
-  const [lo, hi] = domain;
-  const toPx = (v) => top + ((hi - v) / (hi - lo)) * (bottom - top);
-  const toValue = (px) => hi - ((px - top) / (bottom - top)) * (hi - lo);
+// Declutters label values on a linear or log y scale: values to pixels,
+// apart, and back to values, so Plot can draw them in data coordinates.
+export function declutterValues(values, domain, { top, bottom, gap, type = "linear" }) {
+  const log = type === "log";
+  const f = log ? Math.log10 : (v) => v;
+  const g = log ? (v) => 10 ** v : (v) => v;
+  const lo = f(domain[0]);
+  const hi = f(domain[1]);
+  const toPx = (v) => top + ((hi - f(v)) / (hi - lo)) * (bottom - top);
+  const toValue = (px) => g(hi - ((px - top) / (bottom - top)) * (hi - lo));
   return declutter(values.map(toPx), { top, bottom, gap }).map(toValue);
 }
 
@@ -199,4 +214,53 @@ export const MAX_SELECTED = 8;
 // can always be cleared.
 export function canSelect(selected, id, max = MAX_SELECTED) {
   return selected.includes(id) || selected.length < max;
+}
+
+// Actual values need exactly one series; anything else is indexed.
+export function displayMode(choice, selectedCount) {
+  return choice === "actual" && selectedCount === 1 ? "actual" : "indexed";
+}
+
+export const DISPLAY_REASON = "Actual values need exactly one series";
+
+// Whether the log option is allowed, and why not. `values` are the plotted
+// level values in indexed mode, or the window's values in actual mode.
+export function logScale(mode, values, { levelsShown = true } = {}) {
+  if (mode === "indexed" && !levelsShown) {
+    return { allowed: false, reason: "Log scale applies to level series; rates are always linear" };
+  }
+  if (values.some((v) => v <= 0)) {
+    return {
+      allowed: false,
+      reason: mode === "actual"
+        ? "Log scale needs every value in the window above zero"
+        : "Log scale needs every indexed level above zero",
+    };
+  }
+  return { allowed: true, reason: null };
+}
+
+// Stored values with from <= date <= to; no anchor, no start clamping.
+export function actualPoints(series, from, to) {
+  const { dates, values } = series;
+  const points = [];
+  for (let i = firstOnOrAfter(dates, from); i < dates.length && dates[i] <= to; i++) {
+    points.push({ date: dates[i], value: values[i], plotted: values[i] });
+  }
+  return points;
+}
+
+export function formatActual(value) {
+  return String(value);
+}
+
+export function actualSubtitle(unit, type) {
+  return `${unit}, ${type} scale`;
+}
+
+// Actual-values y-axis: rates on linear start at zero (reference line at 0);
+// levels, and anything on log, have no reference line.
+export function actualAxis(kind, type) {
+  const rateLinear = kind === "rate" && type === "linear";
+  return { reference: rateLinear ? 0 : null, zeroFloor: rateLinear };
 }
