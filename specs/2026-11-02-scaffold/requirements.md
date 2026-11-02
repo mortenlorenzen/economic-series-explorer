@@ -7,8 +7,8 @@
 ## Decisions
 - `js/series.js` starts with `plottedValue(kind, value, anchor)` from BRIEF §6.5 (`level` → 100 × value / anchor, `rate` → value − anchor); unknown kind throws. Small, already specified, and gives the JS test something real.
 - The R side has no code yet; the testthat test checks that `tests/fixtures/` exists, so the R half of the harness runs and can fail.
-- `run-tests.sh` runs testthat (`stop_on_failure = TRUE`) and then `node --test tests/js/`; it exits non-zero if either fails. Uses `set -euo pipefail`; runs from the repo root regardless of the caller's directory.
-- renv: `renv.lock` records testthat and its dependencies only. `renv/library/` is not committed (renv's own `renv/.gitignore`).
+- `run-tests.sh` runs `Rscript tests/testthat.R` (testthat, `stop_on_failure = TRUE`) and then `node --test tests/js/`; it exits non-zero if either fails. Uses `set -euo pipefail`; no `package.json` (Node 26 detects ES module syntax); runs from the repo root regardless of the caller's directory.
+- renv: implicit snapshot; `renv.lock` records renv, testthat and its dependencies only. The testthat call lives in `tests/testthat.R` (not inline in the shell script) so renv's dependency scan sees it. `renv/library/` is not committed (renv's own `renv/.gitignore`).
 - `index.qmd` uses only OJS cells, so Quarto renders it with the markdown engine and CI needs no R.
 - `_quarto.yml`: website project, output `_site/`, title "Economic Series Explorer", `js/` listed under `resources` so the module is published.
 - `build-site.yml` triggers: push to `main` and `workflow_dispatch`. Actions pinned to current major versions: `actions/checkout@v7`, `quarto-dev/quarto-actions/setup@v2` with Quarto 1.10.19, `actions/configure-pages@v6`, `actions/upload-pages-artifact@v5`, `actions/deploy-pages@v5`. Concurrency group `pages`, no cancel of an in-progress deploy.
