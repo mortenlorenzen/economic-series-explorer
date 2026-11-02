@@ -4,6 +4,7 @@ import {
   plottedValue, toRows, shiftYears, presetRange, effectiveStart,
   anchorAndIndex, colorFor, formatEndLabel, yDomain, declutter, declutterValues,
   canSelect, formatChange, panelHeights, PANELS, shownKinds, chartSubtitle,
+  displayMode, logScale, actualPoints, formatActual, actualSubtitle,
 } from "../../js/series.js";
 
 test("level is indexed to 100 at the anchor", () => {
@@ -191,4 +192,64 @@ test("chartSubtitle joins the parts that apply", () => {
     "100 = value on 1992-01-02. Window starts 1992-01-02, when Dow Jones data begins");
   assert.equal(chartSubtitle([], "1992-01-02", { name: "Dow Jones" }),
     "Window starts 1992-01-02, when Dow Jones data begins");
+});
+
+test("displayMode is actual only with Actual chosen and one series", () => {
+  assert.equal(displayMode("actual", 1), "actual");
+  assert.equal(displayMode("actual", 2), "indexed");
+  assert.equal(displayMode("actual", 0), "indexed");
+  assert.equal(displayMode("indexed", 1), "indexed");
+});
+
+test("logScale in indexed mode needs a levels panel with values above zero", () => {
+  assert.deepEqual(logScale("indexed", [100, 250]), { allowed: true, reason: null });
+  const ratesOnly = logScale("indexed", [], { levelsShown: false });
+  assert.equal(ratesOnly.allowed, false);
+  assert.match(ratesOnly.reason, /rates are always linear/);
+  assert.match(logScale("indexed", [100, 0]).reason, /indexed level above zero/);
+});
+
+test("logScale in actual mode needs every window value above zero", () => {
+  assert.equal(logScale("actual", [4.2, 0.1]).allowed, true);
+  const r = logScale("actual", [2.1, -0.4]);
+  assert.equal(r.allowed, false);
+  assert.match(r.reason, /every value in the window above zero/);
+  assert.equal(logScale("actual", [0]).allowed, false);
+});
+
+test("actualPoints clips to From/To inclusive, without anchoring", () => {
+  const pts = actualPoints(daily, "2020-01-03", "2020-01-07");
+  assert.deepEqual(pts.map((p) => [p.date, p.plotted]), [
+    ["2020-01-03", 55], ["2020-01-06", 60], ["2020-01-07", 45],
+  ]);
+  assert.deepEqual(actualPoints(daily, "2021-01-01", "2021-12-31"), []);
+});
+
+test("yDomain on log pads 5% of the log10 span and stays above zero", () => {
+  const [lo, hi] = yDomain([10, 1000], null, { type: "log" });
+  assert.ok(Math.abs(Math.log10(lo) - 0.9) < 1e-12);
+  assert.ok(Math.abs(Math.log10(hi) - 3.1) < 1e-12);
+  assert.ok(lo > 0);
+});
+
+test("yDomain with a reference of 0 starts a positive rate axis below zero", () => {
+  const [lo] = yDomain([3.5, 5.0], 0);
+  assert.ok(lo < 0);
+  const [lo2, hi2] = yDomain([20, 30], null);
+  assert.deepEqual([lo2, hi2], [19.5, 30.5]);
+});
+
+test("declutterValues on log works in log10 pixel positions", () => {
+  const domain = [10, 1000]; // 2 decades over 400 px: 200 px per decade
+  const [a, b] = declutterValues([100, 101], domain, { top: 0, bottom: 400, gap: 14, type: "log" });
+  const px = (v) => ((3 - Math.log10(v)) / 2) * 400;
+  assert.ok(Math.abs(Math.abs(px(a) - px(b)) - 14) < 1e-9);
+  assert.ok(Math.abs(b - 101) < 1e-9); // the upper label keeps its place
+  assert.ok(a < 100); // the lower one moves down
+});
+
+test("formatActual and actualSubtitle", () => {
+  assert.equal(formatActual(7580.07), "7580.07");
+  assert.equal(formatEndLabel("S&P 500", 7580.07, "actual"), "S&P 500 (7580.07)");
+  assert.equal(actualSubtitle("Index points", "log"), "Index points, log scale");
 });
