@@ -1,21 +1,212 @@
 ---
 title: "Economic Series Explorer"
+format:
+  html:
+    page-layout: full
 ---
 
 ```{ojs}
 //| echo: false
-import { toRows } from "./js/series.js"
+import {
+  toRows, presetRange, PRESETS, effectiveStart, anchorAndIndex, colorFor,
+  formatEndLabel, yDomain, declutterValues, canSelect
+} from "./js/series.js"
 
 registry = (await fetch("data/series.json")).json()
-meta = registry[0]
-series = (await fetch(`data/${meta.id}.json`)).json()
-rows = toRows(series)
+registryIndex = new Map(registry.map((s, i) => [s.id, i]))
+// Rate series join with their own panel in phase 6.
+pickable = registry.filter((s) => s.kind === "level")
+DEFAULT_SELECTION = ["sp500", "nasdaq"]
+DEFAULT_PRESET = "10Y"
+```
 
-Plot.plot({
-  title: series.name,
-  width,
-  y: { label: series.unit, grid: true },
-  x: { label: null },
-  marks: [Plot.lineY(rows, { x: "date", y: "value" })]
-})
+::: {.panel-sidebar}
+
+```{ojs}
+//| echo: false
+viewof selected = {
+  const form = html`<div class="picker"></div>`;
+  form.value = DEFAULT_SELECTION.filter((id) => pickable.some((s) => s.id === id));
+  const boxes = new Map();
+  const update = () => {
+    for (const [id, box] of boxes) {
+      box.checked = form.value.includes(id);
+      box.disabled = !canSelect(form.value, id);
+    }
+  };
+  const emit = () => {
+    update();
+    form.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+  for (const category of [...new Set(pickable.map((s) => s.category))]) {
+    const group = html`<fieldset class="picker-group"><legend>${category}</legend></fieldset>`;
+    for (const s of pickable.filter((s) => s.category === category)) {
+      const box = html`<input type="checkbox" value=${s.id}>`;
+      box.onchange = () => {
+        form.value = box.checked
+          ? registry.map((r) => r.id).filter((id) => id === s.id || form.value.includes(id))
+          : form.value.filter((id) => id !== s.id);
+        emit();
+      };
+      boxes.set(s.id, box);
+      group.append(html`<label class="picker-item">${box} ${s.name}</label>`);
+    }
+    form.append(group);
+  }
+  const clear = html`<button type="button" class="btn btn-sm btn-outline-secondary">Deselect All</button>`;
+  clear.onclick = () => {
+    form.value = [];
+    emit();
+  };
+  form.append(clear);
+  update();
+  return form;
+}
+```
+
+```{ojs}
+//| echo: false
+viewof range = {
+  const form = html`<div class="range"><div class="range-label">Date range</div></div>`;
+  const buttons = new Map();
+  const bar = html`<div class="btn-group btn-group-sm" role="group"></div>`;
+  const from = html`<input type="date" class="form-control form-control-sm">`;
+  const to = html`<input type="date" class="form-control form-control-sm">`;
+  const set = (value) => {
+    form.value = value;
+    from.value = value.from;
+    to.value = value.to;
+    for (const [p, b] of buttons) b.classList.toggle("active", p === value.preset);
+  };
+  const emit = () => form.dispatchEvent(new Event("input", { bubbles: true }));
+  for (const preset of Object.keys(PRESETS)) {
+    const b = html`<button type="button" class="btn btn-outline-secondary">${preset}</button>`;
+    b.onclick = () => {
+      set({ ...presetRange(preset, registry), preset });
+      emit();
+    };
+    buttons.set(preset, b);
+    bar.append(b);
+  }
+  const edited = () => {
+    // A cleared input goes back to the date the chart is drawn from.
+    if (!from.value || !to.value) {
+      set(form.value);
+      return;
+    }
+    set({ from: from.value, to: to.value, preset: null });
+    emit();
+  };
+  from.onchange = edited;
+  to.onchange = edited;
+  form.append(
+    bar,
+    html`<label class="range-input">From ${from}</label>`,
+    html`<label class="range-input">To ${to}</label>`
+  );
+  set({ ...presetRange(DEFAULT_PRESET, registry), preset: DEFAULT_PRESET });
+  return form;
+}
+```
+
+:::
+
+::: {.panel-fill}
+
+```{ojs}
+//| echo: false
+utc = (date) => new Date(`${date}T00:00:00Z`)
+selectedMeta = registry.filter((s) => selected.includes(s.id))
+loaded = Promise.all(selectedMeta.map(async (m) => (await fetch(`data/${m.id}.json`)).json()))
+win = effectiveStart(range.from, selectedMeta)
+indexed = loaded.map((series) => ({ series, result: anchorAndIndex(series, win.start, range.to) }))
+```
+
+```{ojs}
+//| echo: false
+{
+  if (selected.length === 0) {
+    return html`<p class="placeholder">Select at least one series</p>`;
+  }
+  if (win.start > range.to) {
+    return html`<p class="placeholder">${
+      win.mover
+        ? `The window ends before ${win.mover.name}'s data begins on ${win.mover.first_date}. Choose a later To date.`
+        : `The window ends before it starts on ${win.start}. Choose a later To date.`
+    }</p>`;
+  }
+
+  const shown = indexed.filter((d) => d.result);
+  const leftOut = indexed.filter((d) => !d.result).map((d) => d.series.name);
+  const note = leftOut.length
+    ? html`<p class="chart-note">Left out (no data within 180 days of ${win.start}): ${leftOut.join(", ")}</p>`
+    : "";
+  const header = html`<div class="chart-header">
+    <h2 class="chart-title">Indexed performance since ${win.start}</h2>
+    <p class="chart-subtitle">100 = value on ${win.start}${
+      win.mover ? `. Window starts ${win.start}, when ${win.mover.name} data begins` : ""
+    }</p>
+  </div>`;
+  if (shown.length === 0) return html`${header}${note}`;
+
+  const height = 480;
+  const marginTop = 20;
+  const marginBottom = 30;
+  const marginRight = 170;
+  const rows = shown.flatMap(({ series, result }) =>
+    result.points.map((p) => ({
+      id: series.id, name: series.name, day: p.date, date: utc(p.date),
+      value: p.value, plotted: p.plotted
+    }))
+  );
+  const domain = yDomain(rows.map((r) => r.plotted), 100);
+  const ends = shown.map(({ series, result }) => {
+    const last = result.points[result.points.length - 1];
+    return { id: series.id, date: utc(last.date), plotted: last.plotted, label: formatEndLabel(series.name, last.plotted) };
+  });
+  const labelY = declutterValues(ends.map((e) => e.plotted), domain, {
+    top: marginTop, bottom: height - marginBottom, gap: 14
+  });
+  ends.forEach((e, i) => (e.labelY = labelY[i]));
+  const ids = shown.map(({ series }) => series.id);
+
+  const chart = Plot.plot({
+    width, height, marginTop, marginBottom, marginRight,
+    x: { type: "utc", domain: [utc(win.start), utc(range.to)], label: null },
+    y: { domain, nice: false, grid: true, label: "Index, start = 100" },
+    color: { domain: ids, range: ids.map((id) => colorFor(registryIndex.get(id))) },
+    marks: [
+      Plot.ruleY([100], { stroke: "currentColor", strokeOpacity: 0.4 }),
+      Plot.lineY(rows, { x: "date", y: "plotted", z: "id", stroke: "id", strokeWidth: 1.5 }),
+      Plot.text(ends, {
+        x: "date", y: "labelY", text: "label", fill: "id",
+        textAnchor: "start", dx: 6, clip: false
+      }),
+      Plot.tip(rows, Plot.pointerX({
+        x: "date", y: "plotted", stroke: "id",
+        channels: { Series: "name", Date: "day", Index: "plotted", Value: "value" },
+        format: { x: false, y: false, stroke: false, Index: (v) => v.toFixed(1), Value: (v) => String(v) }
+      }))
+    ]
+  });
+  return html`${header}${chart}${note}`;
+}
+```
+
+:::
+
+```{=html}
+<style>
+.picker-group { margin-bottom: 0.75rem; }
+.picker-group legend { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; }
+.picker-item { display: block; font-size: 0.9rem; }
+.picker-item input:disabled + * , .picker-item:has(input:disabled) { opacity: 0.5; }
+.range { margin-top: 1rem; }
+.range-label { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; }
+.range-input { display: block; font-size: 0.85rem; margin-top: 0.5rem; }
+.chart-title { font-size: 1.25rem; margin: 0; }
+.chart-subtitle { color: var(--bs-secondary-color, #6c757d); margin: 0 0 0.5rem; }
+.chart-note { font-size: 0.85rem; color: var(--bs-secondary-color, #6c757d); }
+.placeholder { padding: 4rem 0; text-align: center; color: var(--bs-secondary-color, #6c757d); }
+</style>
 ```
