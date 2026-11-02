@@ -1,0 +1,20 @@
+project:
+  type: website
+  output-dir: _site
+  render:
+    - "*.qmd"
+  resources:
+    - /js/
+
+website:
+  title: "Economic Series Explorer"
+  site-url: "https://mortenlorenzen.github.io/economic-series-explorer/"
+  repo-url: "https://github.com/mortenlorenzen/economic-series-explorer"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Explorer
+
+format:
+  html:
+    theme: cosmo

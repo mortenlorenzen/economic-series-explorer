@@ -1,3 +1,9 @@
 .claude/last-run.json
 .obsidian/
 .DS_Store
+_site/
+.quarto/
+/.luarc.json
+
+/.quarto/
+**/*.quarto_ipynb
