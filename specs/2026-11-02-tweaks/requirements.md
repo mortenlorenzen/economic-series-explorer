@@ -10,6 +10,8 @@
   - Every control sits in one bar above the chart, in this order: Series, Date range, Display, Y-axis scale, Export. The bar wraps on narrow screens.
   - The chart uses the full page width.
   - **Series** (owner's follow-up: checkboxes, not a dropdown): the grouped checkboxes and Deselect All are always visible, as one wrapping row of category groups at the top of the bar; the other controls follow below. The max-8 rule and the registry order are unchanged.
+  - A thin line separates the series row from the date range and other controls (owner's follow-up).
+  - The description note, chart title, subtitle, panels and notes sit together in one bordered card under the bar (owner's follow-up).
   - **Display** and **Y-axis scale** are inline radio groups, with the same rules and tooltips as before.
 - **Date slider** (owner's choice: slider only; replaces the From/To date inputs):
   - One track with two handles, From and To, spanning the earliest `first_date` to the latest `last_date` in the registry, in steps of one day.
