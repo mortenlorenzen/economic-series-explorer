@@ -9,7 +9,7 @@ format:
 ```{ojs}
 //| echo: false
 import {
-  toRows, presetRange, PRESETS, effectiveStart, anchorAndIndex, colorFor,
+  toRows, presetRange, PRESETS, effectiveStart, anchorAndIndex, assignColors,
   formatEndLabel, formatChange, yDomain, declutterValues, canSelect,
   PANELS, panelHeights, shownKinds, chartSubtitle,
   displayMode, DISPLAY_REASON, logScale, actualPoints, actualSubtitle, actualAxis,
@@ -224,6 +224,8 @@ viewof scaleChoice.setState(!logState.allowed, logState.reason, "linear")
 //| echo: false
 utc = (date) => new Date(`${date}T00:00:00Z`)
 selectedMeta = registry.filter((s) => selected.includes(s.id))
+// One colour per selected series, never shared (registry colour when free).
+colorById = assignColors(selectedMeta.map((m) => m.id), (id) => registryIndex.get(id))
 // Series that fail to load are named above the chart and otherwise treated
 // as not drawn; the rest still plot.
 loads = loadAll(selectedMeta.map((m) => m.id), loadSeries)
@@ -401,7 +403,7 @@ function drawPanel(list, { label, reference, zeroFloor = false, type, labelKind,
     width, height, marginTop, marginBottom, marginLeft, marginRight,
     x: { type: "utc", domain: xDomain.map(utc), label: null, axis: showXAxis ? "bottom" : null },
     y: { type, domain, nice: false, grid: true, label },
-    color: { domain: ids, range: ids.map((id) => colorFor(registryIndex.get(id))) },
+    color: { domain: ids, range: ids.map((id) => colorById.get(id)) },
     marks: [
       reference === null ? null : Plot.ruleY([reference], { stroke: "currentColor", strokeOpacity: 0.4 }),
       Plot.lineY(rows, { x: "date", y: "plotted", z: "id", stroke: "id", strokeWidth: 1.5 }),

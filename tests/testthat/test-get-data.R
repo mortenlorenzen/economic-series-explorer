@@ -18,8 +18,9 @@ test_that("read_registry stops on missing or extra columns", {
 test_that("the real series.csv is a valid registry", {
   reg <- read_registry(test_path("..", "..", "series.csv"))
   expect_equal(reg$id, c(
-    "sp500", "djia", "nasdaq", "dxy", "gdp", "housing", "inflation",
-    "unemployment", "labor_participation", "treasury10yr", "debt_gdp"
+    "sp500", "djia", "nasdaq", "hsi", "csi300", "msci_acwi", "dxy",
+    "gold", "oil", "copper", "bitcoin", "gdp", "housing", "inflation", "cpi_dk",
+    "unemployment", "labor_participation", "fedfunds", "treasury10yr", "debt_gdp"
   ))
 })
 

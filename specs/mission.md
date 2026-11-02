@@ -8,14 +8,14 @@ A static web app for comparing economic time series on a shared date axis: marke
 - Secondary: anyone who opens the public site. The about page stays short and factual; no teaching texts.
 
 ## What success looks like
-- All eleven series load with full history and the daily pipeline stays green.
+- All series in the registry (twenty since 2026-11-02) load with full history and the daily pipeline stays green.
 - Any 1–8 series can be compared indexed on one date axis, levels and rates together.
 - Adding a series is one row in `series.csv` and nothing else.
 
 ## In scope
 - Several series charted together, indexed to 100 at the start of a chosen date window (levels), or as percentage-point change (rates).
 - A single series charted as actual values, with a linear or log y-axis.
-- Eleven series from Yahoo Finance and FRED (BRIEF §6.1), with full available history.
+- Twenty series from Yahoo Finance and FRED (BRIEF §6.1's eleven plus nine added by the owner on 2026-11-02), with full available history.
 - A registry file (`series.csv`) that makes adding further series a one-row change.
 - PNG and CSV export of the current chart.
 

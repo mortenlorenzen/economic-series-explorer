@@ -105,6 +105,21 @@ export function colorFor(registryIndex) {
   return OBSERVABLE10[registryIndex % OBSERVABLE10.length];
 }
 
+// Colours for the selected ids (in registry order): each keeps its registry
+// colour unless an earlier one has it, then takes the first unused colour.
+// With at most 8 selected and 10 colours, no two lines share one.
+export function assignColors(ids, indexOf) {
+  const used = new Set();
+  const colors = new Map();
+  for (const id of ids) {
+    let color = colorFor(indexOf(id));
+    if (used.has(color)) color = OBSERVABLE10.find((c) => !used.has(c)) ?? color;
+    used.add(color);
+    colors.set(id, color);
+  }
+  return colors;
+}
+
 // Rate changes carry a sign and "pp"; rounding first keeps −0.04 from
 // showing as "-0.0".
 export function formatChange(plotted) {
