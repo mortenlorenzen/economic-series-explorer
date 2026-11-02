@@ -8,6 +8,7 @@
 
 ## Manual
 - [ ] Before merge: Settings → Actions → General → Workflow permissions → "Allow GitHub Actions to create and approve pull requests" is on; `gh api repos/mortenlorenzen/economic-series-explorer/actions/permissions/workflow -q .can_approve_pull_request_reviews` prints `true`
+- [x] "Allow squash merging" is on (`gh api repos/mortenlorenzen/economic-series-explorer -q .allow_squash_merge` → `true`, checked 2026-11-02)
 - [ ] After merge: run "Update data" with workflow_dispatch → green; if data changed, a PR "Update series data [automated]" is opened and merged, its branch deleted, and `main` has one new commit
 - [ ] "Build site" runs from the `workflow_run` trigger and deploys
 - [ ] The next scheduled 06:00 UTC run is green
