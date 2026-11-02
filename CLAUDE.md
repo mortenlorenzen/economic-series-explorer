@@ -4,6 +4,11 @@
 <!-- How to check work. The constitution fills these in. The Stop hook runs the Test command; `none` or a <placeholder> disables it. -->
 - Test: `./run-tests.sh`
 - Lint/typecheck: `none`
+- Preview: `quarto preview` (site on localhost, live reload)
+- Refresh data: `Rscript get_data.R` (network; tests never need it)
+
+## Git
+- `main` is protected: every change goes through a branch and a PR, merged by the owner. Never push to `main`.
 
 ## Specs
 This project uses spec-driven development.
