@@ -63,3 +63,9 @@ test_that("write_data writes the per-series file and the index", {
   expect_equal(idx[[1]]$n, 4)
   expect_false(any(c("dates", "values") %in% names(idx[[1]])))
 })
+
+test_that("values are written with 7 significant digits", {
+  path <- withr::local_tempfile(fileext = ".json")
+  write_json_file(list(values = c(7744.0601, 17.66, 0.123456789)), path)
+  expect_equal(readLines(path), '{"values":[7744.06,17.66,0.1234568]}')
+})

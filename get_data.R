@@ -65,7 +65,7 @@ series_json <- function(row, df) {
 }
 
 write_json_file <- function(x, path) {
-  json <- jsonlite::toJSON(x, auto_unbox = TRUE, digits = 4)
+  json <- jsonlite::toJSON(x, auto_unbox = TRUE, digits = I(7))
   writeLines(json, path, useBytes = TRUE)
 }
 
