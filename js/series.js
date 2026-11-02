@@ -105,8 +105,37 @@ export function colorFor(registryIndex) {
   return OBSERVABLE10[registryIndex % OBSERVABLE10.length];
 }
 
-export function formatEndLabel(name, plotted) {
-  return `${name} (${plotted.toFixed(1)})`;
+// Rate changes carry a sign and "pp"; rounding first keeps −0.04 from
+// showing as "-0.0".
+export function formatChange(plotted) {
+  const rounded = Math.round(plotted * 10) / 10 || 0;
+  return `${rounded >= 0 ? "+" : ""}${rounded.toFixed(1)} pp`;
+}
+
+export function formatEndLabel(name, plotted, kind = "level") {
+  return `${name} (${kind === "rate" ? formatChange(plotted) : plotted.toFixed(1)})`;
+}
+
+// Panel settings by kind, in drawing order: levels on top, rates below.
+export const PANELS = [
+  { kind: "level", label: "Index, start = 100", reference: 100 },
+  { kind: "rate", label: "Change, percentage points", reference: 0 },
+];
+
+export const PLOT_HEIGHT = 480;
+export const LEVEL_SHARE = 0.6;
+
+// Plot height per shown kind: levels get 60% when both panels show.
+export function panelHeights(kinds, total = PLOT_HEIGHT) {
+  const hasLevel = kinds.includes("level");
+  const hasRate = kinds.includes("rate");
+  if (hasLevel && hasRate) {
+    const level = Math.round(total * LEVEL_SHARE);
+    return { level, rate: total - level };
+  }
+  if (hasLevel) return { level: total };
+  if (hasRate) return { rate: total };
+  return {};
 }
 
 // Y domain covering the values and the reference line, padded 5% each side.

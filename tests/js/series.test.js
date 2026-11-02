@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   plottedValue, toRows, shiftYears, presetRange, effectiveStart,
   anchorAndIndex, colorFor, formatEndLabel, yDomain, declutter, declutterValues,
-  canSelect,
+  canSelect, formatChange, panelHeights, PANELS,
 } from "../../js/series.js";
 
 test("level is indexed to 100 at the anchor", () => {
@@ -147,4 +147,30 @@ test("canSelect disables unticked boxes once eight are ticked", () => {
   assert.equal(canSelect(eight, "i"), false);
   assert.equal(canSelect(eight, "a"), true);
   assert.equal(canSelect(eight.slice(0, 7), "i"), true);
+});
+
+test("rate series start at 0 and change in percentage points", () => {
+  const rate = { kind: "rate", dates: ["2020-01-01", "2020-02-01"], values: [4.0, 5.5] };
+  assert.deepEqual(anchorAndIndex(rate, "2020-01-01", "2020-12-31").points.map((p) => p.plotted), [0, 1.5]);
+});
+
+test("rate end labels carry a sign and pp, without -0.0", () => {
+  assert.equal(formatEndLabel("Unemployment Rate", 1.24, "rate"), "Unemployment Rate (+1.2 pp)");
+  assert.equal(formatEndLabel("Inflation Rate", -0.43, "rate"), "Inflation Rate (-0.4 pp)");
+  assert.equal(formatChange(-0.04), "+0.0 pp");
+  assert.equal(formatEndLabel("S&P 500", 184.26, "level"), "S&P 500 (184.3)");
+});
+
+test("panelHeights gives levels 60% when both panels show", () => {
+  assert.deepEqual(panelHeights(["level", "rate"]), { level: 288, rate: 192 });
+  assert.deepEqual(panelHeights(["rate", "level", "level"]), { level: 288, rate: 192 });
+  assert.deepEqual(panelHeights(["level"]), { level: 480 });
+  assert.deepEqual(panelHeights(["rate"]), { rate: 480 });
+});
+
+test("PANELS puts levels on top with their labels and reference lines", () => {
+  assert.deepEqual(PANELS.map((p) => [p.kind, p.label, p.reference]), [
+    ["level", "Index, start = 100", 100],
+    ["rate", "Change, percentage points", 0],
+  ]);
 });
