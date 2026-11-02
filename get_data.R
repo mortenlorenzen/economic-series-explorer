@@ -136,7 +136,7 @@ apply_transform <- function(df, row) {
 yoy <- function(df) {
   earlier <- as.Date(paste0(
     as.integer(format(df$date, "%Y")) - 1, format(df$date, "-%m-%d")
-  ), optional = TRUE)
+  ), format = "%Y-%m-%d", optional = TRUE)
   prev <- df$value[match(earlier, df$date)]
   keep <- !is.na(prev)
   out <- data.frame(date = df$date[keep], value = 100 * (df$value[keep] / prev[keep] - 1))
@@ -210,7 +210,12 @@ build_series <- function(row, fetch, dir, today) {
 run_pipeline <- function(reg, fetch = fetch_series, dir = "data",
                          today = as.Date(format(Sys.time(), tz = "UTC"))) {
   results <- lapply(seq_len(nrow(reg)), function(i) {
-    tryCatch(build_series(reg[i, ], fetch, dir, today), error = function(e) e)
+    id <- reg$id[i]
+    tryCatch(build_series(reg[i, ], fetch, dir, today), error = function(e) {
+      msg <- conditionMessage(e)
+      if (!startsWith(msg, paste0(id, ": "))) msg <- paste0(id, ": ", msg)
+      simpleError(msg)
+    })
   })
   failed <- vapply(results, inherits, logical(1), "error")
   if (any(failed)) {

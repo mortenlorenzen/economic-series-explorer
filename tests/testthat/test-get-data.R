@@ -166,6 +166,14 @@ test_that("yoy drops dates without an observation one year earlier", {
   expect_equal(out$value, c(10, 5))
 })
 
+test_that("yoy handles a series that starts on 29 February", {
+  df <- data.frame(date = as.Date(c("2024-02-29", "2024-03-01", "2025-03-01")),
+                   value = c(1, 2, 3))
+  out <- yoy(df)
+  expect_equal(format(out$date), "2025-03-01")
+  expect_equal(out$value, 50)
+})
+
 test_that("yoy drops 29 February, which has no date a year earlier", {
   df <- data.frame(date = as.Date(c("2023-02-28", "2024-02-28", "2024-02-29")),
                    value = c(100, 102, 103))
@@ -212,7 +220,7 @@ test_that("run_pipeline writes every series when all succeed", {
   expect_setequal(list.files(dir), c("a.json", "b.json", "series.json"))
 })
 
-test_that("run_pipeline writes nothing and names every failed series", {
+test_that("run_pipeline writes nothing when one series fails, and names it", {
   dir <- withr::local_tempdir()
   run_pipeline(pipeline_registry(), fake_fetch, dir, today = as.Date("2026-01-03"))
   before <- tools::md5sum(list.files(dir, full.names = TRUE))
@@ -220,11 +228,26 @@ test_that("run_pipeline writes nothing and names every failed series", {
   reg <- pipeline_registry()
   reg$symbol[2] <- "B-broken"
   err <- tryCatch(
+    run_pipeline(reg, fake_fetch, dir, today = as.Date("2026-01-03")),
+    error = conditionMessage
+  )
+  expect_match(err, "1 of 2 series failed, nothing written")
+  expect_match(err, "b: HTTP 404", fixed = TRUE)
+  expect_false(grepl("\na:", err))
+  expect_equal(tools::md5sum(list.files(dir, full.names = TRUE)), before)
+})
+
+test_that("run_pipeline names every failed series, without doubling ids", {
+  dir <- withr::local_tempdir()
+  reg <- pipeline_registry()
+  reg$symbol[2] <- "B-broken"
+  err <- tryCatch(
     run_pipeline(reg, fake_fetch, dir, today = as.Date("2026-03-01")),
     error = conditionMessage
   )
   expect_match(err, "2 of 2 series failed, nothing written")
-  expect_match(err, "a: last observation is 58 days old", fixed = TRUE)
-  expect_match(err, "HTTP 404", fixed = TRUE)
-  expect_equal(tools::md5sum(list.files(dir, full.names = TRUE)), before)
+  expect_match(err, "\na: last observation is 58 days old")
+  expect_match(err, "\nb: HTTP 404")
+  expect_false(grepl("a: a:", err, fixed = TRUE))
+  expect_length(list.files(dir), 0)
 })

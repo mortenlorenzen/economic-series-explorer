@@ -19,7 +19,7 @@
   - Transformed values are rounded only when written (7 significant digits, phase 2).
 - **Staleness** (`check_staleness(row, df, today)`): age = `today − last date` in days, `today` = the run's UTC date. Age > `max_stale_days` → warning naming the series and age; age > 2 × `max_stale_days` → error. Dates are FRED's period start dates (e.g. 2026-07-01 for Q3), and the §6.1 thresholds are set for that.
 - **Regression** (`check_regression(id, n, dir = "data")`): if `data/<id>.json` exists and its `n` is greater than the new `n` → error naming both counts. No existing file → fine (a new series).
-- **Run**: `main()` processes every series, collecting errors instead of stopping at the first, so one run reports every broken series. Any error → stop with all messages, nothing written. Warnings are printed and don't stop the run. Step order: fetch → clean → transform → staleness → regression; all series finish before `write_data()`.
+- **Run**: `main()` processes every series, collecting errors instead of stopping at the first, so one run reports every broken series; each message starts with the series id (added when the error itself lacks it). Any error → stop with all messages, nothing written. Warnings are printed and don't stop the run. Step order: fetch → clean → transform → staleness → regression; all series finish before `write_data()`.
 - **Units** come from FRED's series metadata, checked 2026-11-02; the Yahoo indices use "Index points":
   - sp500, djia, nasdaq, dxy: Index points.
   - gdp: Billions of chained 2017 dollars.
@@ -92,4 +92,8 @@
 ### Requirement: Nothing written on failure
 #### Scenario: one series fails
 - WHEN one of several series fails a check
-- THEN `run_pipeline()` stops listing that series, and no file in the data directory changes
+- THEN `run_pipeline()` stops listing that series by id, and no file in the data directory changes
+
+#### Scenario: several fail
+- WHEN more than one series fails
+- THEN every one is listed, each once by id
