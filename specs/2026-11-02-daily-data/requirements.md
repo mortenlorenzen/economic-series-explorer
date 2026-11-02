@@ -12,7 +12,7 @@
 - `concurrency: update-data`, no cancel, so two runs never push at once.
 - `build-site.yml` gets `workflow_run: { workflows: ["Update data"], types: [completed] }`. Its build job runs when the event isn't `workflow_run` or the run's conclusion is `success`. For `workflow_run`, checkout takes the latest `main`, which includes the new data commit.
 - A run with no data change still triggers a rebuild. This is harmless, and keeps the trigger simple.
-- **Pending (questions.md):** how the push reaches `main` under the `protect-main` ruleset (pull request required, no bypass actors; checked 2026-11-02). This sets the `permissions:` block and the push step.
+- **Push to `main`** (questions.md Phase 4, answer A): the "GitHub Actions" app is on the `protect-main` ruleset's bypass list, so the job pushes directly with `GITHUB_TOKEN`. `permissions: contents: write` on update-data only. The checkout keeps its default credentials, and the push is a plain `git push` (fast-forward; the ruleset still blocks force-pushes and deletion). Pull requests stay required for people.
 
 ## Context
 - Roadmap Phase 4 (BRIEF §6.3 workflows). Tech stack decisions log, 2026-11-02: `build-site.yml` runs on `workflow_run` because pushes made with `GITHUB_TOKEN` don't trigger other workflows.
