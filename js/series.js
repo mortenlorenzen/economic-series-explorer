@@ -8,3 +8,13 @@ export function plottedValue(kind, value, anchor) {
   if (kind === "rate") return value - anchor;
   throw new Error(`unknown kind: ${kind}`);
 }
+
+// Turns a series file's parallel `dates`/`values` arrays into rows of
+// {date, value}, with dates parsed as UTC midnight.
+export function toRows(series) {
+  const { dates, values } = series;
+  if (dates.length !== values.length) {
+    throw new Error(`${series.id}: ${dates.length} dates but ${values.length} values`);
+  }
+  return dates.map((d, i) => ({ date: new Date(`${d}T00:00:00Z`), value: values[i] }));
+}

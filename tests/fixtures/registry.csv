@@ -1,0 +1,2 @@
+id,name,category,source,symbol,kind,transform,unit,max_stale_days,description
+sp500,S&P 500,Markets,yahoo,^GSPC,level,none,Index points,7,"Test description, with a comma."

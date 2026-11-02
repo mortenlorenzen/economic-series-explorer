@@ -1,0 +1,1 @@
+[{"id":"sp500","name":"S&P 500","category":"Markets","source":"yahoo","symbol":"^GSPC","kind":"level","unit":"Index points","description":"Stock market index of 500 large US companies, weighted by market value. Daily adjusted close from Yahoo Finance.","first_date":"1927-12-30","last_date":"2026-10-30","n":24826}]
