@@ -11,11 +11,19 @@ import {
   toRows, presetRange, PRESETS, effectiveStart, anchorAndIndex, colorFor,
   formatEndLabel, formatChange, yDomain, declutterValues, canSelect,
   PANELS, panelHeights, shownKinds, chartSubtitle,
-  displayMode, DISPLAY_REASON, logScale, actualPoints, actualSubtitle, actualAxis
+  displayMode, DISPLAY_REASON, logScale, actualPoints, actualSubtitle, actualAxis,
+  createLoader, isDaily, windowOverTenYears, downsampleWeekly
 } from "./js/series.js"
 
 registry = (await fetch("data/series.json")).json()
 registryIndex = new Map(registry.map((s, i) => [s.id, i]))
+loadSeries = createLoader(async (id) => (await fetch(`data/${id}.json`)).json())
+// isDaily per series id, computed once.
+dailyById = new Map()
+daily = (series) => {
+  if (!dailyById.has(series.id)) dailyById.set(series.id, isDaily(series.dates));
+  return dailyById.get(series.id);
+}
 pickable = registry
 DEFAULT_SELECTION = ["sp500", "nasdaq"]
 DEFAULT_PRESET = "10Y"
@@ -169,7 +177,7 @@ viewof scaleChoice.setState(!logState.allowed, logState.reason, "linear")
 //| echo: false
 utc = (date) => new Date(`${date}T00:00:00Z`)
 selectedMeta = registry.filter((s) => selected.includes(s.id))
-loaded = Promise.all(selectedMeta.map(async (m) => (await fetch(`data/${m.id}.json`)).json()))
+loaded = Promise.all(selectedMeta.map((m) => loadSeries(m.id)))
 mode = displayMode(displayChoice, selected.length)
 win = effectiveStart(range.from, selectedMeta)
 indexed = loaded.map((series) => ({ series, result: anchorAndIndex(series, win.start, range.to) }))
@@ -267,10 +275,16 @@ function drawPanel(list, { label, reference, zeroFloor = false, type, labelKind,
   const marginBottom = showXAxis ? 30 : 8;
   const marginLeft = 56;
   const marginRight = 170;
+  // Over ten years, daily series are drawn as weekly averages; the points
+  // passed in are raw, so anchors and checks upstream use full resolution.
+  const thin = windowOverTenYears(xDomain[0], xDomain[1]);
+  list = list.map(({ series, points }) => ({
+    series, points: thin && daily(series) ? downsampleWeekly(points) : points
+  }));
   const rows = list.flatMap(({ series, points }) =>
     points.map((p) => ({
-      id: series.id, name: series.name, day: p.date, date: utc(p.date),
-      value: p.value, plotted: p.plotted
+      id: series.id, name: series.name, day: p.weekly ? `Week to ${p.date}` : p.date,
+      date: utc(p.date), value: p.value, plotted: p.plotted
     }))
   );
   const domain = yDomain(rows.map((r) => r.plotted), reference, { type, zeroFloor });

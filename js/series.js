@@ -264,3 +264,66 @@ export function actualAxis(kind, type) {
   const rateLinear = kind === "rate" && type === "linear";
   return { reference: rateLinear ? 0 : null, zeroFloor: rateLinear };
 }
+
+// One fetch per series id: load(id) returns the cached promise. A failed
+// fetch is dropped from the cache so the next load tries again.
+export function createLoader(fetchJson) {
+  const cache = new Map();
+  return function load(id) {
+    if (!cache.has(id)) {
+      const promise = fetchJson(id).catch((error) => {
+        cache.delete(id);
+        throw error;
+      });
+      cache.set(id, promise);
+    }
+    return cache.get(id);
+  };
+}
+
+// Daily when the median gap between observations is at most 7 days.
+export function isDaily(dates) {
+  if (dates.length < 2) return false;
+  const gaps = [];
+  for (let i = 1; i < dates.length; i++) gaps.push(daysBetween(dates[i - 1], dates[i]));
+  gaps.sort((a, b) => a - b);
+  return gaps[Math.floor(gaps.length / 2)] <= 7;
+}
+
+// ISO 8601 week, e.g. "2020-W53": weeks start on Monday and belong to the
+// year of their Thursday.
+export function isoWeekKey(date) {
+  const t = Date.parse(`${date}T00:00:00Z`);
+  const weekday = (new Date(t).getUTCDay() + 6) % 7; // Monday = 0
+  const thursday = new Date(t + (3 - weekday) * DAY_MS);
+  const year = thursday.getUTCFullYear();
+  const week = Math.floor((thursday - Date.UTC(year, 0, 1)) / DAY_MS / 7) + 1;
+  return `${year}-W${String(week).padStart(2, "0")}`;
+}
+
+// Strictly longer than ten years: start before To − 10 years.
+export function windowOverTenYears(start, to) {
+  return start < shiftYears(to, -10);
+}
+
+// Weekly averages of drawn points, each at its week's last date, rounded to
+// the 7 significant digits the data files store. The first and last points
+// stay exact; `weekly` marks averaged points.
+export function downsampleWeekly(points) {
+  if (points.length <= 2) return points.slice();
+  const out = [points[0]];
+  let group = [];
+  const flush = () => {
+    if (!group.length) return;
+    const mean = (k) => Number((group.reduce((sum, p) => sum + p[k], 0) / group.length).toPrecision(7));
+    out.push({ date: group[group.length - 1].date, value: mean("value"), plotted: mean("plotted"), weekly: true });
+    group = [];
+  };
+  for (let i = 1; i < points.length - 1; i++) {
+    if (group.length && isoWeekKey(group[0].date) !== isoWeekKey(points[i].date)) flush();
+    group.push(points[i]);
+  }
+  flush();
+  out.push(points[points.length - 1]);
+  return out;
+}

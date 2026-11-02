@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-11-02
+- Phase 8: series files cached after the first download; daily series drawn as weekly averages for windows over 10 years
 - Phase 7: Display (Indexed / Actual values) and Y-axis scale (Linear / Log) controls; actual-values chart for one series; log on the levels panel
 - Phase 6: all eleven series pickable; rate series as percentage-point change in a second panel under the levels
 - Phase 5: series picker (level series, max 8), date-range presets and From/To, indexed chart with end labels and tooltip
