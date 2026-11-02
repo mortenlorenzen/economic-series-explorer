@@ -10,7 +10,7 @@ import {
   exportRows, toCsv, exportFileName, todayLocal,
   sourceCaption, exportLayout, EXPORT_TEXT, wrapText, parseFontFaces, pickFontFaces,
   checkSeries, fetchSeries, loadAll, failureMessage,
-  descriptionNote, sliderBounds, dateToStep, stepToDate,
+  descriptionNote, sliderBounds, dateToStep, stepToDate, pngFooter, descriptionLines,
 } from "../../js/series.js";
 
 test("level is indexed to 100 at the anchor", () => {
@@ -415,11 +415,26 @@ test("todayLocal uses the local calendar date", () => {
 });
 
 test("sourceCaption names sources by first appearance", () => {
-  assert.equal(
-    sourceCaption(["yahoo", "fred", "yahoo"]),
-    "Source: Yahoo Finance, FRED. Economic Series Explorer, mortenlorenzen.github.io/economic-series-explorer"
-  );
-  assert.match(sourceCaption(["bls"]), /^Source: bls\. /);
+  assert.equal(sourceCaption(["yahoo", "fred", "yahoo"]), "Source: Yahoo Finance, FRED.");
+  assert.equal(sourceCaption(["bls"]), "Source: bls.");
+});
+
+test("pngFooter has the date, site and copyright", () => {
+  assert.equal(pngFooter("2026-11-02"), "2026-11-02 · mortenlorenzen.github.io/economic-series-explorer · © 2026 Morten Lorenzen");
+});
+
+test("descriptionLines gives one line per series", () => {
+  assert.deepEqual(descriptionLines([{ name: "S&P 500", description: "Index." }, { name: "GDP", description: "Output." }]),
+    ["S&P 500: Index.", "GDP: Output."]);
+});
+
+test("exportLayout puts descriptions between the note and the caption, footer last", () => {
+  const plain = exportLayout([480]);
+  assert.equal(plain.descriptions, null);
+  assert.ok(plain.footer > plain.caption && plain.height > plain.footer);
+  const full = exportLayout([480], { note: 1, descriptions: 3 });
+  assert.ok(full.note < full.descriptions && full.descriptions < full.caption && full.caption < full.footer);
+  assert.equal(full.height - plain.height, EXPORT_TEXT.note.line + 3 * EXPORT_TEXT.descriptions.line + 4);
 });
 
 test("exportLayout stacks panels at their heights between header and caption", () => {

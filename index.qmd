@@ -16,7 +16,7 @@ import {
   createLoader, isDaily, windowOverTenYears, downsampleWeekly,
   exportRows, toCsv, exportFileName, todayLocal, sourceCaption, exportLayout, EXPORT_TEXT, wrapText,
   parseFontFaces, pickFontFaces, fetchSeries, loadAll, failureMessage, descriptionNote,
-  sliderBounds, dateToStep, stepToDate
+  sliderBounds, dateToStep, stepToDate, pngFooter, descriptionLines
 } from "./js/series.js"
 
 registry = (await fetch("data/series.json")).json()
@@ -220,8 +220,12 @@ viewof scaleChoice.setState(!logState.allowed, logState.reason, "linear")
   png.onclick = async () => {
     png.disabled = true;
     try {
-      const caption = sourceCaption(exported.list.map((d) => d.series.source));
-      download(await chartPng(chart, caption), name("png"));
+      const series = exported.list.map((d) => d.series);
+      download(await chartPng(chart, {
+        descriptions: descriptionLines(series),
+        caption: sourceCaption(series.map((s) => s.source)),
+        footer: pngFooter(todayLocal())
+      }), name("png"));
     } catch (error) {
       png.title = `PNG export failed: ${error.message}`;
     } finally {
@@ -441,9 +445,10 @@ function download(blob, name) {
 
 ```{ojs}
 //| echo: false
-// The chart as one SVG — title, subtitle, every panel, note, caption — with
+// The chart as one SVG — title, subtitle, every panel, note, descriptions,
+// caption, footer — with
 // its webfont inlined, rasterised at 2×. Resolves to a PNG blob.
-async function chartPng(el, caption) {
+async function chartPng(el, { descriptions, caption, footer }) {
   const NS = "http://www.w3.org/2000/svg";
   const { pad } = EXPORT_TEXT;
   const panels = [...el.querySelectorAll("svg")].filter((s) => !s.parentElement.closest("svg"));
@@ -471,7 +476,9 @@ async function chartPng(el, caption) {
     title: wrap(titleEl.textContent.trim(), EXPORT_TEXT.title, titleWeight),
     subtitle: wrap(subtitleEl.textContent.trim(), EXPORT_TEXT.subtitle),
     note: noteEl ? wrap(noteEl.textContent.trim(), EXPORT_TEXT.note) : [],
-    caption: wrap(caption, EXPORT_TEXT.caption)
+    descriptions: descriptions.flatMap((d) => wrap(d, EXPORT_TEXT.descriptions)),
+    caption: wrap(caption, EXPORT_TEXT.caption),
+    footer: wrap(footer, EXPORT_TEXT.footer)
   };
   const layout = exportLayout(heights, Object.fromEntries(Object.entries(blocks).map(([k, v]) => [k, v.length])));
   const H = layout.height;
@@ -516,7 +523,9 @@ async function chartPng(el, caption) {
     svg.append(clone);
   });
   if (noteEl) text(blocks.note, layout.note, EXPORT_TEXT.note, { fill: muted });
+  if (blocks.descriptions.length) text(blocks.descriptions, layout.descriptions, EXPORT_TEXT.descriptions);
   text(blocks.caption, layout.caption, EXPORT_TEXT.caption, { fill: muted });
+  text(blocks.footer, layout.footer, EXPORT_TEXT.footer, { fill: muted });
 
   const img = new Image();
   img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}`;
