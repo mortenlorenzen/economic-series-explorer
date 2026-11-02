@@ -12,6 +12,7 @@
   - Max sets From = the earliest `first_date` across all series.
   - The active preset button is highlighted; editing either date clears the highlight.
   - From after To is treated like "window ends before the effective start" (placeholder below).
+  - Clearing either date input restores the date the chart is drawn from; the range only changes on a complete date.
 - **Effective start** = the later of From and the latest `first_date` among the selected series. When a series moved it, the subtitle adds "Window starts <date>, when <name> data begins". On a tie, the first in registry order is named.
 - **Anchor**: each series' first observation on or after the effective start. If that's more than 180 days after the effective start, or there's none up to To, the series is left out, and a note under the chart says "Left out (no data within 180 days of <start>): <names>".
 - **Plotted value**: `100 × value / anchor` (`plottedValue("level", …)` from phase 1). Points run from the anchor date to To, inclusive; the anchor point is always included.
@@ -20,11 +21,11 @@
   - Decluttered: label y positions are pushed apart in pixels to at least 14 px, keeping their order, within the plot area.
   - To make that exact, the y domain is computed in `js/series.js` (min/max of plotted values and 100, padded 5%) and passed to Plot with `nice: false`. The right margin leaves room for the labels.
 - **Axes**: x is a UTC time scale with domain [effective start, To]; Plot's default ticks adapt to the window length. The y label is "Index, start = 100". Reference line at 100.
-- **Tooltip**: Plot `tip` with the pointer, showing series name, date (YYYY-MM-DD), plotted value (1 decimal) and actual value (as stored).
+- **Tooltip**: Plot `tip` with the pointer, showing series name, date (YYYY-MM-DD), plotted value (1 decimal) and actual value (as stored, no thousands separators).
 - **Title** "Indexed performance since <effective start>". **Subtitle** "100 = value on <effective start>", plus the window-start sentence when it applies. Dates are YYYY-MM-DD.
 - **Placeholders**, needed so the page never breaks; the rest of the §6.7 table is phase 10:
   - No series selected → "Select at least one series".
-  - Effective start after To → "The window ends before <name>'s data begins on <date>. Choose a later To date."
+  - Effective start after To → "The window ends before <name>'s data begins on <date>. Choose a later To date." When no series moved the start (From itself is after To): "The window ends before it starts on <From>. Choose a later To date."
 - **Loading**: `data/series.json` once; the selected series' files with `Promise.all` on each change. No cache yet (phase 8).
 - **Layout**: Quarto `.panel-sidebar` with the controls, `.panel-fill` with the chart.
 

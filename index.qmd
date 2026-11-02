@@ -89,7 +89,11 @@ viewof range = {
     bar.append(b);
   }
   const edited = () => {
-    if (!from.value || !to.value) return;
+    // A cleared input goes back to the date the chart is drawn from.
+    if (!from.value || !to.value) {
+      set(form.value);
+      return;
+    }
     set({ from: from.value, to: to.value, preset: null });
     emit();
   };
@@ -181,7 +185,7 @@ indexed = loaded.map((series) => ({ series, result: anchorAndIndex(series, win.s
       Plot.tip(rows, Plot.pointerX({
         x: "date", y: "plotted", stroke: "id",
         channels: { Series: "name", Date: "day", Index: "plotted", Value: "value" },
-        format: { x: false, y: false, stroke: false, Index: (v) => v.toFixed(1) }
+        format: { x: false, y: false, stroke: false, Index: (v) => v.toFixed(1), Value: (v) => String(v) }
       }))
     ]
   });
