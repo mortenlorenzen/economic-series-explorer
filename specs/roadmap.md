@@ -2,7 +2,7 @@
 
 Very small phases. Each phase = one branch = one `specs/YYYY-MM-DD-feature-name/` folder. Every phase leaves the deployed site working.
 
-- [ ] Phase 1 — Scaffold: Quarto site with placeholder `index.qmd`, `_quarto.yml`, `run-tests.sh` (testthat + `node --test`, one trivial test each), `js/series.js` stub, renv init with `renv.lock`, `LICENSE` (MIT), `build-site.yml` deploying to GitHub Pages (covers BRIEF §3, §4, §6.3 build-site, §6.9)
+- [x] Phase 1 — Scaffold: Quarto site with placeholder `index.qmd`, `_quarto.yml`, `run-tests.sh` (testthat + `node --test`, one trivial test each), `js/series.js` stub, renv init with `renv.lock`, `LICENSE` (MIT), `build-site.yml` deploying to GitHub Pages (covers BRIEF §3, §4, §6.3 build-site, §6.9)
 - [ ] Phase 2 — First series end to end: `series.csv` with S&P 500 only, `get_data.R` writing `data/sp500.json` and `data/series.json`, `index.qmd` plotting it (covers BRIEF §6.1, §6.2 steps 1–3 and 7, §6.3 JSON)
 - [ ] Phase 3 — Registry and pipeline: all eleven series and descriptions, registry validation, `transform` lookup (`yoy`), retries, staleness and regression checks (covers BRIEF §6.1, §6.2)
 - [ ] Phase 4 — Daily data workflow: `update-data.yml` committing changed `data/`, `build-site.yml` also on `workflow_run` (covers BRIEF §6.3 workflows)

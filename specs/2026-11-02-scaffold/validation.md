@@ -8,6 +8,7 @@
 - [ ] Lint/typecheck: none
 
 ## Manual
+- [x] Settings > Pages > Source is "GitHub Actions" (prerequisite for the first deploy; confirmed via the API on 2026-11-02)
 - [ ] `quarto preview`: page shows "Economic Series Explorer" and the OJS cell value 150; no console errors
 - [ ] After merge: "Build site" workflow on `main` is green and https://mortenlorenzen.github.io/economic-series-explorer/ shows the placeholder
 
