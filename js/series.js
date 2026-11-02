@@ -497,3 +497,12 @@ export async function loadAll(ids, load) {
 export function failureMessage(names) {
   return `Could not load ${names.join(", ")}. Untick and tick again to retry.`;
 }
+
+// Description note above the chart: one or two series as plain lines, more
+// collapsed into a <details> whose summary lists the names. null = no note.
+export function descriptionNote(selected) {
+  if (selected.length === 0) return null;
+  const lines = selected.map((s) => ({ name: s.name, description: s.description }));
+  if (selected.length <= 2) return { collapsed: false, summary: null, lines };
+  return { collapsed: true, summary: `About the series: ${selected.map((s) => s.name).join(", ")}`, lines };
+}

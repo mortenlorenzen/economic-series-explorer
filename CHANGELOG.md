@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-11-02
+- Phase 11: series descriptions above the chart (collapsed past two series), About page with sources and credit, navbar About and GitHub links, site description, Open Graph and footer
 - Phase 10: a series that fails to load is named above the chart while the others still plot; all six edge cases in the brief checked; y-axis labels no longer touch the top tick
 - Phase 9: PNG and CSV export of the current chart; CSV in long format at full resolution, PNG with every panel, title and source caption at 2×
 - Phase 8: series files cached after the first download; daily series drawn as weekly averages for windows over 10 years

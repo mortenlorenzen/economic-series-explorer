@@ -1,5 +1,6 @@
 ---
 title: "Economic Series Explorer"
+description: "Compare economic time series from Yahoo Finance and FRED on one date axis, indexed or as actual values."
 format:
   html:
     page-layout: full
@@ -14,7 +15,7 @@ import {
   displayMode, DISPLAY_REASON, logScale, actualPoints, actualSubtitle, actualAxis,
   createLoader, isDaily, windowOverTenYears, downsampleWeekly,
   exportRows, toCsv, exportFileName, todayLocal, sourceCaption, exportLayout, EXPORT_TEXT, wrapText,
-  parseFontFaces, pickFontFaces, fetchSeries, loadAll, failureMessage
+  parseFontFaces, pickFontFaces, fetchSeries, loadAll, failureMessage, descriptionNote
 } from "./js/series.js"
 
 registry = (await fetch("data/series.json")).json()
@@ -236,6 +237,19 @@ exported = {
   }
   if (win.start > range.to || shown.length === 0) return null;
   return { mode, from: win.start, list: shown.map(({ series, result }) => ({ series, points: result.points })) };
+}
+```
+
+```{ojs}
+//| echo: false
+// Descriptions of the selected series; outside `chart`, so not in the PNG.
+{
+  const note = descriptionNote(selectedMeta);
+  if (!note) return html``;
+  const lines = note.lines.map((l) => html`<p class="description-line"><strong>${l.name}</strong>: ${l.description}</p>`);
+  return note.collapsed
+    ? html`<details class="description-note"><summary>${note.summary}</summary>${lines}</details>`
+    : html`<div class="description-note">${lines}</div>`;
 }
 ```
 
@@ -548,6 +562,9 @@ async function inlineFonts(family, weights) {
 .chart-title { font-size: 1.25rem; margin: 0; }
 .chart-subtitle { color: var(--bs-secondary-color, #6c757d); margin: 0 0 0.5rem; }
 .chart-note { font-size: 0.85rem; color: var(--bs-secondary-color, #6c757d); }
+.description-note { font-size: 0.85rem; margin-bottom: 0.75rem; }
+.description-note summary { cursor: pointer; }
+.description-line { margin: 0.15rem 0; }
 .load-error { color: var(--bs-danger, #dc3545); font-size: 0.9rem; }
 .placeholder { padding: 4rem 0; text-align: center; color: var(--bs-secondary-color, #6c757d); }
 </style>

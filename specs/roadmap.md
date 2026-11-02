@@ -12,7 +12,7 @@ Very small phases. Each phase = one branch = one `specs/YYYY-MM-DD-feature-name/
 - [x] Phase 8 — Loading cache and downsampling (covers BRIEF §6.4 Loading, §6.6 Downsampling)
 - [x] Phase 9 — PNG and CSV export (covers BRIEF §6.7 export)
 - [x] Phase 10 — Edge cases (covers BRIEF §6.7 table)
-- [ ] Phase 11 — Description note, about page and site metadata (covers BRIEF §6.6 Description note, §6.9 about.qmd, _quarto.yml)
+- [x] Phase 11 — Description note, about page and site metadata (covers BRIEF §6.6 Description note, §6.9 about.qmd, _quarto.yml)
 
 ## Later / maybe
 - BRIEF §6.8: more series, more transforms, recession shading, shareable URLs, common-frequency resampling.

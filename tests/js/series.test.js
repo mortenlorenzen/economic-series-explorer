@@ -10,6 +10,7 @@ import {
   exportRows, toCsv, exportFileName, todayLocal,
   sourceCaption, exportLayout, EXPORT_TEXT, wrapText, parseFontFaces, pickFontFaces,
   checkSeries, fetchSeries, loadAll, failureMessage,
+  descriptionNote,
 } from "../../js/series.js";
 
 test("level is indexed to 100 at the anchor", () => {
@@ -512,4 +513,26 @@ test("a failed load is retried through the loader", async () => {
 
 test("failureMessage names the series", () => {
   assert.equal(failureMessage(["Dow Jones", "NASDAQ"]), "Could not load Dow Jones, NASDAQ. Untick and tick again to retry.");
+});
+
+const meta = (name) => ({ id: name.toLowerCase(), name, description: `${name} described.` });
+
+test("descriptionNote: no series, no note", () => {
+  assert.equal(descriptionNote([]), null);
+});
+
+test("descriptionNote: one or two series as plain lines", () => {
+  assert.deepEqual(descriptionNote([meta("S&P 500")]), {
+    collapsed: false, summary: null, lines: [{ name: "S&P 500", description: "S&P 500 described." }],
+  });
+  const two = descriptionNote([meta("S&P 500"), meta("NASDAQ")]);
+  assert.equal(two.collapsed, false);
+  assert.deepEqual(two.lines.map((l) => l.name), ["S&P 500", "NASDAQ"]);
+});
+
+test("descriptionNote: more than two collapse with the names in the summary", () => {
+  const three = descriptionNote([meta("S&P 500"), meta("NASDAQ"), meta("Unemployment Rate")]);
+  assert.equal(three.collapsed, true);
+  assert.equal(three.summary, "About the series: S&P 500, NASDAQ, Unemployment Rate");
+  assert.equal(three.lines.length, 3);
 });

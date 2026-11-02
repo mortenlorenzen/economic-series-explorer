@@ -11,10 +11,20 @@ website:
   title: "Economic Series Explorer"
   site-url: "https://mortenlorenzen.github.io/economic-series-explorer/"
   repo-url: "https://github.com/mortenlorenzen/economic-series-explorer"
+  description: "Compare economic time series from Yahoo Finance and FRED on one date axis, indexed or as actual values."
+  open-graph: true
   navbar:
     left:
       - href: index.qmd
         text: Explorer
+      - href: about.qmd
+        text: About
+    right:
+      - icon: github
+        href: "https://github.com/mortenlorenzen/economic-series-explorer"
+        text: GitHub
+  page-footer:
+    center: "Data: Yahoo Finance, FRED · MIT licence"
 
 format:
   html:
