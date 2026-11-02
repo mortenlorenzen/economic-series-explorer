@@ -327,3 +327,35 @@ export function downsampleWeekly(points) {
   out.push(points[points.length - 1]);
   return out;
 }
+
+// Export rows: full-resolution points of the exported series, in the order
+// given (registry order), as {series, date, value, plotted, mode}.
+// `plotted` is rounded to the 7 significant digits the data files store.
+export function exportRows(mode, list) {
+  return list.flatMap(({ series, points }) =>
+    points.map((p) => ({
+      series: series.id, date: p.date, value: p.value,
+      plotted: Number(p.plotted.toPrecision(7)), mode
+    }))
+  );
+}
+
+export const CSV_COLUMNS = ["series", "date", "value", "plotted", "mode"];
+
+// Long-format CSV; no quoting, since ids, dates and numbers hold no commas.
+export function toCsv(rows) {
+  const lines = [CSV_COLUMNS.join(",")];
+  for (const r of rows) lines.push(CSV_COLUMNS.map((c) => String(r[c])).join(","));
+  return lines.join("\n") + "\n";
+}
+
+// "<ids joined by +>_<mode>_<from>_<to>_<today>.<ext>"
+export function exportFileName(ids, mode, from, to, today, ext = "csv") {
+  return `${ids.join("+")}_${mode}_${from}_${to}_${today}.${ext}`;
+}
+
+// The viewer's local date as "YYYY-MM-DD".
+export function todayLocal(now = new Date()) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
