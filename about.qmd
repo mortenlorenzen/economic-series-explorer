@@ -1,0 +1,36 @@
+---
+title: "About"
+description: "What Economic Series Explorer shows, where the data comes from, and credits."
+---
+
+## Purpose
+
+Economic Series Explorer puts market indices, output, prices, labour and interest-rate series on one date axis, so they can be compared over any window from one year to their full history.
+
+## How it works
+
+- A pipeline in R fetches every series once a day (06:00 UTC) and commits the data to the repository as JSON. The site is static; all computation runs in the browser.
+- **Indexed**: level series are set to 100 on the start date; rate series show the change from the start date in percentage points.
+- **Actual values**: one series as published, on a linear or log scale.
+- Windows longer than ten years draw daily series as weekly averages. Indexing and CSV export always use the full daily data.
+
+## Sources
+
+Market indices and the dollar index are adjusted closes from [Yahoo Finance](https://finance.yahoo.com/). All other series come from [FRED](https://fred.stlouisfed.org/), Federal Reserve Bank of St. Louis.
+
+```{ojs}
+//| echo: false
+sources = (await fetch("data/series.json")).json()
+SOURCE_LABEL = ({ yahoo: "Yahoo Finance", fred: "FRED" })
+html`<table class="table table-sm sources">
+  <thead><tr><th>Series</th><th>Source</th><th>Symbol</th><th>Unit</th><th>From</th><th>To</th></tr></thead>
+  <tbody>${sources.map((s) => html`<tr>
+    <td>${s.name}</td><td>${SOURCE_LABEL[s.source] ?? s.source}</td><td><code>${s.symbol}</code></td>
+    <td>${s.unit}</td><td>${s.first_date}</td><td>${s.last_date}</td>
+  </tr>`)}</tbody>
+</table>`
+```
+
+## Credit and licence
+
+Inspired by [jhelvy/potus-econ-scorecard](https://github.com/jhelvy/potus-econ-scorecard), used as a reference for how such an app can behave; no code or text is copied from it. Economic Series Explorer is released under the MIT licence; the source is on [GitHub](https://github.com/mortenlorenzen/economic-series-explorer).

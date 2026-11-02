@@ -21,7 +21,7 @@
   - **Sources**: Yahoo Finance (adjusted close) and FRED. A table built in the browser from `data/series.json` lists name, source, symbol, unit, first date and last date, so it never needs editing when a series is added.
   - **Credit and licence**: inspired by [jhelvy/potus-econ-scorecard](https://github.com/jhelvy/potus-econ-scorecard), with no code or text copied; MIT licence; link to the repo.
 - **_quarto.yml**:
-  - navbar: Explorer and About on the left, a GitHub icon linking `repo-url` on the right;
+  - navbar: Explorer and About on the left, a GitHub link (icon and text) to `repo-url` on the right;
   - `website.description`, one sentence;
   - `open-graph: true`;
   - a page footer with "Data: Yahoo Finance, FRED · MIT licence".
