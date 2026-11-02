@@ -9,13 +9,13 @@ format:
 //| echo: false
 import {
   toRows, presetRange, PRESETS, effectiveStart, anchorAndIndex, colorFor,
-  formatEndLabel, yDomain, declutterValues, canSelect
+  formatEndLabel, formatChange, yDomain, declutterValues, canSelect,
+  PANELS, panelHeights, shownKinds, chartSubtitle
 } from "./js/series.js"
 
 registry = (await fetch("data/series.json")).json()
 registryIndex = new Map(registry.map((s, i) => [s.id, i]))
-// Rate series join with their own panel in phase 6.
-pickable = registry.filter((s) => s.kind === "level")
+pickable = registry
 DEFAULT_SELECTION = ["sp500", "nasdaq"]
 DEFAULT_PRESET = "10Y"
 ```
@@ -141,42 +141,62 @@ indexed = loaded.map((series) => ({ series, result: anchorAndIndex(series, win.s
   const note = leftOut.length
     ? html`<p class="chart-note">Left out (no data within 180 days of ${win.start}): ${leftOut.join(", ")}</p>`
     : "";
+  const kinds = shownKinds(shown.map((d) => d.series));
+  const subtitle = chartSubtitle(kinds, win.start, win.mover);
   const header = html`<div class="chart-header">
     <h2 class="chart-title">Indexed performance since ${win.start}</h2>
-    <p class="chart-subtitle">100 = value on ${win.start}${
-      win.mover ? `. Window starts ${win.start}, when ${win.mover.name} data begins` : ""
-    }</p>
+    <p class="chart-subtitle">${subtitle}</p>
   </div>`;
   if (shown.length === 0) return html`${header}${note}`;
 
-  const height = 480;
-  const marginTop = 20;
-  const marginBottom = 30;
+  const heights = panelHeights(kinds);
+  const panels = PANELS.filter((p) => kinds.includes(p.kind)).map((panel, i, all) =>
+    drawPanel(panel, shown.filter((d) => d.series.kind === panel.kind), {
+      height: heights[panel.kind], showXAxis: i === all.length - 1
+    })
+  );
+  return html`${header}${panels}${note}`;
+}
+```
+
+```{ojs}
+//| echo: false
+// One panel of the indexed chart. Both panels share the x-domain, width and
+// left/right margins so dates line up; only the bottom one shows x ticks.
+function drawPanel(panel, shown, { height, showXAxis }) {
+  const marginTop = 12;
+  const marginBottom = showXAxis ? 30 : 8;
+  const marginLeft = 56;
   const marginRight = 170;
+  const rate = panel.kind === "rate";
   const rows = shown.flatMap(({ series, result }) =>
     result.points.map((p) => ({
       id: series.id, name: series.name, day: p.date, date: utc(p.date),
       value: p.value, plotted: p.plotted
     }))
   );
-  const domain = yDomain(rows.map((r) => r.plotted), 100);
+  const domain = yDomain(rows.map((r) => r.plotted), panel.reference);
   const ends = shown.map(({ series, result }) => {
     const last = result.points[result.points.length - 1];
-    return { id: series.id, date: utc(last.date), plotted: last.plotted, label: formatEndLabel(series.name, last.plotted) };
+    return {
+      id: series.id, date: utc(last.date), plotted: last.plotted,
+      label: formatEndLabel(series.name, last.plotted, panel.kind)
+    };
   });
   const labelY = declutterValues(ends.map((e) => e.plotted), domain, {
     top: marginTop, bottom: height - marginBottom, gap: 14
   });
   ends.forEach((e, i) => (e.labelY = labelY[i]));
   const ids = shown.map(({ series }) => series.id);
+  const plottedName = rate ? "Change" : "Index";
 
-  const chart = Plot.plot({
-    width, height, marginTop, marginBottom, marginRight,
-    x: { type: "utc", domain: [utc(win.start), utc(range.to)], label: null },
-    y: { domain, nice: false, grid: true, label: "Index, start = 100" },
+  return Plot.plot({
+    width, height, marginTop, marginBottom, marginLeft, marginRight,
+    x: { type: "utc", domain: [utc(win.start), utc(range.to)], label: null, axis: showXAxis ? "bottom" : null },
+    y: { domain, nice: false, grid: true, label: panel.label },
     color: { domain: ids, range: ids.map((id) => colorFor(registryIndex.get(id))) },
     marks: [
-      Plot.ruleY([100], { stroke: "currentColor", strokeOpacity: 0.4 }),
+      Plot.ruleY([panel.reference], { stroke: "currentColor", strokeOpacity: 0.4 }),
       Plot.lineY(rows, { x: "date", y: "plotted", z: "id", stroke: "id", strokeWidth: 1.5 }),
       Plot.text(ends, {
         x: "date", y: "labelY", text: "label", fill: "id",
@@ -184,12 +204,15 @@ indexed = loaded.map((series) => ({ series, result: anchorAndIndex(series, win.s
       }),
       Plot.tip(rows, Plot.pointerX({
         x: "date", y: "plotted", stroke: "id",
-        channels: { Series: "name", Date: "day", Index: "plotted", Value: "value" },
-        format: { x: false, y: false, stroke: false, Index: (v) => v.toFixed(1), Value: (v) => String(v) }
+        channels: { Series: "name", Date: "day", [plottedName]: "plotted", Value: "value" },
+        format: {
+          x: false, y: false, stroke: false,
+          [plottedName]: rate ? formatChange : (v) => v.toFixed(1),
+          Value: (v) => String(v)
+        }
       }))
     ]
   });
-  return html`${header}${chart}${note}`;
 }
 ```
 
