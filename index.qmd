@@ -10,7 +10,8 @@ format:
 import {
   toRows, presetRange, PRESETS, effectiveStart, anchorAndIndex, colorFor,
   formatEndLabel, formatChange, yDomain, declutterValues, canSelect,
-  PANELS, panelHeights, shownKinds, chartSubtitle
+  PANELS, panelHeights, shownKinds, chartSubtitle,
+  displayMode, DISPLAY_REASON, logScale, actualPoints, actualSubtitle
 } from "./js/series.js"
 
 registry = (await fetch("data/series.json")).json()
@@ -109,6 +110,57 @@ viewof range = {
 }
 ```
 
+```{ojs}
+//| echo: false
+// A radio group as an OJS view. setState(disabled, reason, fallback) greys it
+// out with the reason as tooltip and moves it back to `fallback`.
+function radioView(name, legend, options, value) {
+  const form = html`<fieldset class="radio-group"><legend>${legend}</legend></fieldset>`;
+  form.value = value;
+  const emit = () => form.dispatchEvent(new Event("input", { bubbles: true }));
+  const inputs = options.map(([v, label]) => {
+    const input = html`<input type="radio" name=${name} value=${v}>`;
+    input.checked = v === value;
+    input.onchange = () => {
+      form.value = v;
+      emit();
+    };
+    form.append(html`<label class="radio-item">${input} ${label}</label>`);
+    return input;
+  });
+  form.setState = (disabled, reason, fallback) => {
+    for (const input of inputs) input.disabled = disabled;
+    form.title = disabled ? reason : "";
+    form.classList.toggle("disabled", disabled);
+    if (disabled && form.value !== fallback) {
+      form.value = fallback;
+      for (const input of inputs) input.checked = input.value === fallback;
+      emit();
+    }
+  };
+  return form;
+}
+```
+
+```{ojs}
+//| echo: false
+viewof displayChoice = radioView("display", "Display", [["indexed", "Indexed"], ["actual", "Actual values"]], "indexed")
+viewof scaleChoice = radioView("scale", "Y-axis scale", [["linear", "Linear"], ["log", "Log"]], "linear")
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+// Display is only open with exactly one series; otherwise back to Indexed.
+viewof displayChoice.setState(selected.length !== 1, DISPLAY_REASON, "indexed")
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+viewof scaleChoice.setState(!logState.allowed, logState.reason, "linear")
+```
+
 :::
 
 ::: {.panel-fill}
@@ -118,8 +170,18 @@ viewof range = {
 utc = (date) => new Date(`${date}T00:00:00Z`)
 selectedMeta = registry.filter((s) => selected.includes(s.id))
 loaded = Promise.all(selectedMeta.map(async (m) => (await fetch(`data/${m.id}.json`)).json()))
+mode = displayMode(displayChoice, selected.length)
 win = effectiveStart(range.from, selectedMeta)
 indexed = loaded.map((series) => ({ series, result: anchorAndIndex(series, win.start, range.to) }))
+shown = indexed.filter((d) => d.result)
+kinds = shownKinds(shown.map((d) => d.series))
+actual = mode === "actual" ? { series: loaded[0], points: actualPoints(loaded[0], range.from, range.to) } : null
+logState = mode === "actual"
+  ? logScale("actual", actual.points.map((p) => p.value))
+  : logScale("indexed", shown.filter((d) => d.series.kind === "level").flatMap((d) => d.result.points.map((p) => p.plotted)), {
+      levelsShown: kinds.includes("level")
+    })
+scaleType = logState.allowed ? scaleChoice : "linear"
 ```
 
 ```{ojs}
@@ -128,6 +190,7 @@ indexed = loaded.map((series) => ({ series, result: anchorAndIndex(series, win.s
   if (selected.length === 0) {
     return html`<p class="placeholder">Select at least one series</p>`;
   }
+  if (mode === "actual") return actualChart();
   if (win.start > range.to) {
     return html`<p class="placeholder">${
       win.mover
@@ -136,81 +199,112 @@ indexed = loaded.map((series) => ({ series, result: anchorAndIndex(series, win.s
     }</p>`;
   }
 
-  const shown = indexed.filter((d) => d.result);
   const leftOut = indexed.filter((d) => !d.result).map((d) => d.series.name);
   const note = leftOut.length
     ? html`<p class="chart-note">Left out (no data within 180 days of ${win.start}): ${leftOut.join(", ")}</p>`
     : "";
-  const kinds = shownKinds(shown.map((d) => d.series));
-  const subtitle = chartSubtitle(kinds, win.start, win.mover);
   const header = html`<div class="chart-header">
     <h2 class="chart-title">Indexed performance since ${win.start}</h2>
-    <p class="chart-subtitle">${subtitle}</p>
+    <p class="chart-subtitle">${chartSubtitle(kinds, win.start, win.mover)}</p>
   </div>`;
   if (shown.length === 0) return html`${header}${note}`;
 
   const heights = panelHeights(kinds);
-  const panels = PANELS.filter((p) => kinds.includes(p.kind)).map((panel, i, all) =>
-    drawPanel(panel, shown.filter((d) => d.series.kind === panel.kind), {
-      height: heights[panel.kind], showXAxis: i === all.length - 1
-    })
-  );
+  const panels = PANELS.filter((p) => kinds.includes(p.kind)).map((panel, i, all) => {
+    const rate = panel.kind === "rate";
+    return drawPanel(
+      shown.filter((d) => d.series.kind === panel.kind).map(({ series, result }) => ({ series, points: result.points })),
+      {
+        label: panel.label, reference: panel.reference,
+        // Log applies to the levels panel only; rates stay linear.
+        type: rate ? "linear" : scaleType,
+        labelKind: panel.kind,
+        tipName: rate ? "Change" : "Index",
+        tipFormat: rate ? formatChange : (v) => v.toFixed(1),
+        xDomain: [win.start, range.to],
+        height: heights[panel.kind], showXAxis: i === all.length - 1
+      }
+    );
+  });
   return html`${header}${panels}${note}`;
 }
 ```
 
 ```{ojs}
 //| echo: false
-// One panel of the indexed chart. Both panels share the x-domain, width and
-// left/right margins so dates line up; only the bottom one shows x ticks.
-function drawPanel(panel, shown, { height, showXAxis }) {
+// Actual-values mode: one series as stored, clipped to [From, To].
+function actualChart() {
+  const { series, points } = actual;
+  if (points.length === 0) {
+    return html`<p class="placeholder">No ${series.name} data between ${range.from} and ${range.to}.</p>`;
+  }
+  const header = html`<div class="chart-header">
+    <h2 class="chart-title">${series.name}</h2>
+    <p class="chart-subtitle">${actualSubtitle(series.unit, scaleType)}</p>
+  </div>`;
+  const chart = drawPanel([{ series, points }], {
+    label: series.unit,
+    // Rates on a linear scale start the y-axis at zero.
+    reference: series.kind === "rate" && scaleType === "linear" ? 0 : null,
+    type: scaleType,
+    labelKind: "actual",
+    tipName: null,
+    xDomain: [range.from, range.to],
+    height: 480, showXAxis: true
+  });
+  return html`${header}${chart}`;
+}
+```
+
+```{ojs}
+//| echo: false
+// One chart panel. Panels share the width and left/right margins so dates
+// line up; only the bottom one shows x ticks. `reference` null = no line.
+function drawPanel(list, { label, reference, type, labelKind, tipName, tipFormat, xDomain, height, showXAxis }) {
   const marginTop = 12;
   const marginBottom = showXAxis ? 30 : 8;
   const marginLeft = 56;
   const marginRight = 170;
-  const rate = panel.kind === "rate";
-  const rows = shown.flatMap(({ series, result }) =>
-    result.points.map((p) => ({
+  const rows = list.flatMap(({ series, points }) =>
+    points.map((p) => ({
       id: series.id, name: series.name, day: p.date, date: utc(p.date),
       value: p.value, plotted: p.plotted
     }))
   );
-  const domain = yDomain(rows.map((r) => r.plotted), panel.reference);
-  const ends = shown.map(({ series, result }) => {
-    const last = result.points[result.points.length - 1];
+  const domain = yDomain(rows.map((r) => r.plotted), reference, { type });
+  const ends = list.map(({ series, points }) => {
+    const last = points[points.length - 1];
     return {
       id: series.id, date: utc(last.date), plotted: last.plotted,
-      label: formatEndLabel(series.name, last.plotted, panel.kind)
+      label: formatEndLabel(series.name, last.plotted, labelKind)
     };
   });
   const labelY = declutterValues(ends.map((e) => e.plotted), domain, {
-    top: marginTop, bottom: height - marginBottom, gap: 14
+    top: marginTop, bottom: height - marginBottom, gap: 14, type
   });
   ends.forEach((e, i) => (e.labelY = labelY[i]));
-  const ids = shown.map(({ series }) => series.id);
-  const plottedName = rate ? "Change" : "Index";
+  const ids = list.map(({ series }) => series.id);
+  const channels = { Series: "name", Date: "day" };
+  const format = { x: false, y: false, stroke: false, Value: (v) => String(v) };
+  if (tipName) {
+    channels[tipName] = "plotted";
+    format[tipName] = tipFormat;
+  }
+  channels.Value = "value";
 
   return Plot.plot({
     width, height, marginTop, marginBottom, marginLeft, marginRight,
-    x: { type: "utc", domain: [utc(win.start), utc(range.to)], label: null, axis: showXAxis ? "bottom" : null },
-    y: { domain, nice: false, grid: true, label: panel.label },
+    x: { type: "utc", domain: xDomain.map(utc), label: null, axis: showXAxis ? "bottom" : null },
+    y: { type, domain, nice: false, grid: true, label },
     color: { domain: ids, range: ids.map((id) => colorFor(registryIndex.get(id))) },
     marks: [
-      Plot.ruleY([panel.reference], { stroke: "currentColor", strokeOpacity: 0.4 }),
+      reference === null ? null : Plot.ruleY([reference], { stroke: "currentColor", strokeOpacity: 0.4 }),
       Plot.lineY(rows, { x: "date", y: "plotted", z: "id", stroke: "id", strokeWidth: 1.5 }),
       Plot.text(ends, {
         x: "date", y: "labelY", text: "label", fill: "id",
         textAnchor: "start", dx: 6, clip: false
       }),
-      Plot.tip(rows, Plot.pointerX({
-        x: "date", y: "plotted", stroke: "id",
-        channels: { Series: "name", Date: "day", [plottedName]: "plotted", Value: "value" },
-        format: {
-          x: false, y: false, stroke: false,
-          [plottedName]: rate ? formatChange : (v) => v.toFixed(1),
-          Value: (v) => String(v)
-        }
-      }))
+      Plot.tip(rows, Plot.pointerX({ x: "date", y: "plotted", stroke: "id", channels, format }))
     ]
   });
 }
@@ -227,6 +321,10 @@ function drawPanel(panel, shown, { height, showXAxis }) {
 .range { margin-top: 1rem; }
 .range-label { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; }
 .range-input { display: block; font-size: 0.85rem; margin-top: 0.5rem; }
+.radio-group { margin-top: 1rem; }
+.radio-group legend { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; }
+.radio-item { display: block; font-size: 0.9rem; }
+.radio-group.disabled { opacity: 0.5; }
 .chart-title { font-size: 1.25rem; margin: 0; }
 .chart-subtitle { color: var(--bs-secondary-color, #6c757d); margin: 0 0 0.5rem; }
 .chart-note { font-size: 0.85rem; color: var(--bs-secondary-color, #6c757d); }
