@@ -60,3 +60,88 @@ export function effectiveStart(from, selected) {
   }
   return { start, mover };
 }
+
+const DAY_MS = 86400000;
+const daysBetween = (a, b) => (Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / DAY_MS;
+
+export const MAX_ANCHOR_GAP_DAYS = 180;
+
+// First index i with dates[i] >= date (dates sorted ascending).
+function firstOnOrAfter(dates, date) {
+  let lo = 0;
+  let hi = dates.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (dates[mid] < date) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+// Anchors a series at its first observation on or after `start` and returns
+// the indexed points up to `to`, or null when that observation is missing or
+// more than MAX_ANCHOR_GAP_DAYS after `start`.
+export function anchorAndIndex(series, start, to) {
+  const { dates, values, kind } = series;
+  const i0 = firstOnOrAfter(dates, start);
+  if (i0 >= dates.length || dates[i0] > to) return null;
+  if (daysBetween(start, dates[i0]) > MAX_ANCHOR_GAP_DAYS) return null;
+  const anchor = values[i0];
+  const points = [];
+  for (let i = i0; i < dates.length && dates[i] <= to; i++) {
+    points.push({ date: dates[i], value: values[i], plotted: plottedValue(kind, values[i], anchor) });
+  }
+  return { anchorDate: dates[i0], anchor, points };
+}
+
+// Observable10, assigned by registry index so a series keeps its colour
+// whatever else is selected.
+export const OBSERVABLE10 = [
+  "#4269d0", "#efb118", "#ff725c", "#6cc5b0", "#3ca951",
+  "#ff8ab7", "#a463f2", "#97bbf5", "#9c6b4e", "#9498a0",
+];
+
+export function colorFor(registryIndex) {
+  return OBSERVABLE10[registryIndex % OBSERVABLE10.length];
+}
+
+export function formatEndLabel(name, plotted) {
+  return `${name} (${plotted.toFixed(1)})`;
+}
+
+// Y domain covering the values and the reference line, padded 5% each side.
+export function yDomain(values, reference) {
+  let lo = reference;
+  let hi = reference;
+  for (const v of values) {
+    if (v < lo) lo = v;
+    if (v > hi) hi = v;
+  }
+  const pad = hi > lo ? (hi - lo) * 0.05 : 1;
+  return [lo - pad, hi + pad];
+}
+
+// Pushes pixel positions apart to at least `gap`, keeping their order and
+// staying within [top, bottom] where they fit. Returns positions in the
+// input order.
+export function declutter(positions, { top, bottom, gap }) {
+  const order = positions.map((y, i) => ({ y, i })).sort((a, b) => a.y - b.y);
+  const ys = order.map((o) => Math.min(Math.max(o.y, top), bottom));
+  for (let k = 1; k < ys.length; k++) ys[k] = Math.max(ys[k], ys[k - 1] + gap);
+  if (ys.length && ys[ys.length - 1] > bottom) {
+    ys[ys.length - 1] = bottom;
+    for (let k = ys.length - 2; k >= 0; k--) ys[k] = Math.min(ys[k], ys[k + 1] - gap);
+  }
+  const out = new Array(positions.length);
+  order.forEach((o, k) => (out[o.i] = ys[k]));
+  return out;
+}
+
+// Declutters label values on a linear y scale: values to pixels, apart,
+// and back to values, so Plot can draw them in data coordinates.
+export function declutterValues(values, domain, { top, bottom, gap }) {
+  const [lo, hi] = domain;
+  const toPx = (v) => top + ((hi - v) / (hi - lo)) * (bottom - top);
+  const toValue = (px) => hi - ((px - top) / (bottom - top)) * (hi - lo);
+  return declutter(values.map(toPx), { top, bottom, gap }).map(toValue);
+}
