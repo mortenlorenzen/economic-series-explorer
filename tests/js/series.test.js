@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   plottedValue, toRows, shiftYears, presetRange, effectiveStart,
-  anchorAndIndex, colorFor, formatEndLabel, yDomain, declutter, declutterValues,
+  anchorAndIndex, colorFor, assignColors, OBSERVABLE10, formatEndLabel, yDomain, declutter, declutterValues,
   canSelect, formatChange, panelHeights, PANELS, shownKinds, chartSubtitle,
   displayMode, logScale, actualPoints, formatActual, actualSubtitle, actualAxis,
   createLoader, isDaily, isoWeekKey, windowOverTenYears, downsampleWeekly,
@@ -565,4 +565,24 @@ test("slider steps are days from the earliest first_date", () => {
   for (const d of ["1927-12-30", "2000-02-29", "2016-10-30", "2026-10-30"]) {
     assert.equal(stepToDate(dateToStep(d, b.min), b.min), d);
   }
+});
+
+test("assignColors keeps registry colours when they are free", () => {
+  const index = { sp500: 0, hsi: 4 };
+  const colors = assignColors(["sp500", "hsi"], (id) => index[id]);
+  assert.equal(colors.get("sp500"), OBSERVABLE10[0]);
+  assert.equal(colors.get("hsi"), OBSERVABLE10[4]);
+});
+
+test("assignColors gives a clashing series the first unused colour", () => {
+  const index = { sp500: 0, eleventh: 10 };
+  const colors = assignColors(["sp500", "eleventh"], (id) => index[id]);
+  assert.equal(colors.get("sp500"), OBSERVABLE10[0]);
+  assert.equal(colors.get("eleventh"), OBSERVABLE10[1]);
+});
+
+test("assignColors never repeats a colour among eight series", () => {
+  const ids = ["a", "b", "c", "d", "e", "f", "g", "h"];
+  const index = { a: 0, b: 10, c: 1, d: 11, e: 2, f: 12, g: 19, h: 9 };
+  assert.equal(new Set(assignColors(ids, (id) => index[id]).values()).size, 8);
 });
