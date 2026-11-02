@@ -14,7 +14,7 @@
   - So the 10Y preset (exactly 10 years) is drawn at full resolution, and 20Y and Max are downsampled.
 - **Weekly average**:
   - Group points by ISO 8601 week (Monday start, ISO week-year) and average the drawn value in each week.
-  - The average is plotted at the week's last observation date.
+  - The average is plotted at the week's last observation date, rounded to 7 significant digits (the precision the data files store), so the tooltip never shows float noise.
   - The tooltip's actual value is the average of the stored values in that week.
   - Indexed mode averages the plotted (indexed) values, computed on raw data first; actual mode averages the stored values.
 - **Exact points**: the first point (the anchor in indexed mode, 100 or 0) and the last point are always drawn as they are, not averaged. Other points in their weeks are averaged into one point at that week's last remaining date. Keeping the last point exact keeps the end label at the real last value ("name plus last value", BRIEF §6.6).

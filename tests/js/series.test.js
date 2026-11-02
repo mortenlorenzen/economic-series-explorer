@@ -337,3 +337,10 @@ test("downsampleWeekly keeps a Wednesday anchor as its own point", () => {
 test("downsampleWeekly leaves two points or fewer alone", () => {
   assert.deepEqual(downsampleWeekly([pt("2020-01-06", 1), pt("2020-01-07", 2)]), [pt("2020-01-06", 1), pt("2020-01-07", 2)]);
 });
+
+test("downsampleWeekly rounds averages to 7 significant digits", () => {
+  const out = downsampleWeekly([pt("2020-01-06", 1), pt("2020-01-07", 4523.12), pt("2020-01-08", 4523.13),
+    pt("2020-01-09", 4523.12), pt("2020-01-15", 2)]);
+  assert.equal(out[1].value, 4523.123);
+  assert.equal(out[1].plotted, 4523.123);
+});

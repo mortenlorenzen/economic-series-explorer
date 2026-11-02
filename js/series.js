@@ -306,15 +306,16 @@ export function windowOverTenYears(start, to) {
   return start < shiftYears(to, -10);
 }
 
-// Weekly averages of drawn points, each at its week's last date. The first
-// and last points stay exact; `weekly` marks averaged points.
+// Weekly averages of drawn points, each at its week's last date, rounded to
+// the 7 significant digits the data files store. The first and last points
+// stay exact; `weekly` marks averaged points.
 export function downsampleWeekly(points) {
   if (points.length <= 2) return points.slice();
   const out = [points[0]];
   let group = [];
   const flush = () => {
     if (!group.length) return;
-    const mean = (k) => group.reduce((sum, p) => sum + p[k], 0) / group.length;
+    const mean = (k) => Number((group.reduce((sum, p) => sum + p[k], 0) / group.length).toPrecision(7));
     out.push({ date: group[group.length - 1].date, value: mean("value"), plotted: mean("plotted"), weekly: true });
     group = [];
   };
