@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-11-02
+- Tweaks: controls in a top bar over a full-width chart, series checkboxes in one row, two-handle date slider, PNG with series descriptions and a date · URL · © line, actual end labels at 2 decimals, About and footer text
 - Phase 11: series descriptions above the chart (collapsed past two series), About page with sources and credit, navbar About and GitHub links, site description, Open Graph and footer
 - Phase 10: a series that fails to load is named above the chart while the others still plot; all six edge cases in the brief checked; y-axis labels no longer touch the top tick
 - Phase 9: PNG and CSV export of the current chart; CSV in long format at full resolution, PNG with every panel, title and source caption at 2×

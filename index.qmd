@@ -15,7 +15,8 @@ import {
   displayMode, DISPLAY_REASON, logScale, actualPoints, actualSubtitle, actualAxis,
   createLoader, isDaily, windowOverTenYears, downsampleWeekly,
   exportRows, toCsv, exportFileName, todayLocal, sourceCaption, exportLayout, EXPORT_TEXT, wrapText,
-  parseFontFaces, pickFontFaces, fetchSeries, loadAll, failureMessage, descriptionNote
+  parseFontFaces, pickFontFaces, fetchSeries, loadAll, failureMessage, descriptionNote,
+  sliderBounds, dateToStep, stepToDate, pngFooter, descriptionLines
 } from "./js/series.js"
 
 registry = (await fetch("data/series.json")).json()
@@ -32,10 +33,11 @@ DEFAULT_SELECTION = ["sp500", "nasdaq"]
 DEFAULT_PRESET = "10Y"
 ```
 
-::: {.panel-sidebar}
+::: {.controls-bar}
 
 ```{ojs}
 //| echo: false
+// Checkboxes grouped by category, in one wrapping row above the controls.
 viewof selected = {
   const form = html`<div class="picker"></div>`;
   form.value = DEFAULT_SELECTION.filter((id) => pickable.some((s) => s.id === id));
@@ -78,16 +80,27 @@ viewof selected = {
 
 ```{ojs}
 //| echo: false
+// Presets plus a two-handle slider over every day in the registry. Dragging
+// updates the dates shown; releasing a handle redraws the chart.
 viewof range = {
-  const form = html`<div class="range"><div class="range-label">Date range</div></div>`;
+  const { min, steps } = sliderBounds(registry);
+  const form = html`<div class="range"><span class="control-label">Date range</span></div>`;
   const buttons = new Map();
   const bar = html`<div class="btn-group btn-group-sm" role="group"></div>`;
-  const from = html`<input type="date" class="form-control form-control-sm">`;
-  const to = html`<input type="date" class="form-control form-control-sm">`;
+  const handle = (label) => html`<input type="range" min="0" max=${steps} step="1" aria-label=${label}>`;
+  const lo = handle("From");
+  const hi = handle("To");
+  const dates = html`<span class="range-dates"></span>`;
+  const show = () => {
+    dates.textContent = `${stepToDate(+lo.value, min)} – ${stepToDate(+hi.value, min)}`;
+    // Both handles at one end: the one that can move away goes on top.
+    lo.style.zIndex = +lo.value > steps / 2 ? 3 : 1;
+  };
   const set = (value) => {
     form.value = value;
-    from.value = value.from;
-    to.value = value.to;
+    lo.value = dateToStep(value.from, min);
+    hi.value = dateToStep(value.to, min);
+    show();
     for (const [p, b] of buttons) b.classList.toggle("active", p === value.preset);
   };
   const emit = () => form.dispatchEvent(new Event("input", { bubbles: true }));
@@ -100,22 +113,22 @@ viewof range = {
     buttons.set(preset, b);
     bar.append(b);
   }
-  const edited = () => {
-    // A cleared input goes back to the date the chart is drawn from.
-    if (!from.value || !to.value) {
-      set(form.value);
-      return;
-    }
-    set({ from: from.value, to: to.value, preset: null });
+  // Handles can't cross.
+  lo.oninput = () => {
+    if (+lo.value > +hi.value) lo.value = hi.value;
+    show();
+  };
+  hi.oninput = () => {
+    if (+hi.value < +lo.value) hi.value = lo.value;
+    show();
+  };
+  const released = () => {
+    set({ from: stepToDate(+lo.value, min), to: stepToDate(+hi.value, min), preset: null });
     emit();
   };
-  from.onchange = edited;
-  to.onchange = edited;
-  form.append(
-    bar,
-    html`<label class="range-input">From ${from}</label>`,
-    html`<label class="range-input">To ${to}</label>`
-  );
+  lo.onchange = released;
+  hi.onchange = released;
+  form.append(bar, html`<div class="dual-range">${lo}${hi}</div>`, dates);
   set({ ...presetRange(DEFAULT_PRESET, registry), preset: DEFAULT_PRESET });
   return form;
 }
@@ -189,8 +202,12 @@ viewof scaleChoice.setState(!logState.allowed, logState.reason, "linear")
   png.onclick = async () => {
     png.disabled = true;
     try {
-      const caption = sourceCaption(exported.list.map((d) => d.series.source));
-      download(await chartPng(chart, caption), name("png"));
+      const series = exported.list.map((d) => d.series);
+      download(await chartPng(chart, {
+        descriptions: descriptionLines(series),
+        caption: sourceCaption(series.map((s) => s.source)),
+        footer: pngFooter(todayLocal())
+      }), name("png"));
     } catch (error) {
       png.title = `PNG export failed: ${error.message}`;
     } finally {
@@ -202,8 +219,6 @@ viewof scaleChoice.setState(!logState.allowed, logState.reason, "linear")
 ```
 
 :::
-
-::: {.panel-fill}
 
 ```{ojs}
 //| echo: false
@@ -240,6 +255,8 @@ exported = {
 }
 ```
 
+::: {.chart-card}
+
 ```{ojs}
 //| echo: false
 // Descriptions of the selected series; outside `chart`, so not in the PNG.
@@ -259,6 +276,8 @@ chart = html`<div class="chart">${
   failedNames.length ? html`<p class="load-error">${failureMessage(failedNames)}</p>` : ""
 }${chartContent()}</div>`
 ```
+
+:::
 
 ```{ojs}
 //| echo: false
@@ -396,7 +415,6 @@ function drawPanel(list, { label, reference, zeroFloor = false, type, labelKind,
 }
 ```
 
-:::
 
 ```{ojs}
 //| echo: false
@@ -413,9 +431,10 @@ function download(blob, name) {
 
 ```{ojs}
 //| echo: false
-// The chart as one SVG — title, subtitle, every panel, note, caption — with
+// The chart as one SVG — title, subtitle, every panel, note, descriptions,
+// caption, footer — with
 // its webfont inlined, rasterised at 2×. Resolves to a PNG blob.
-async function chartPng(el, caption) {
+async function chartPng(el, { descriptions, caption, footer }) {
   const NS = "http://www.w3.org/2000/svg";
   const { pad } = EXPORT_TEXT;
   const panels = [...el.querySelectorAll("svg")].filter((s) => !s.parentElement.closest("svg"));
@@ -443,7 +462,9 @@ async function chartPng(el, caption) {
     title: wrap(titleEl.textContent.trim(), EXPORT_TEXT.title, titleWeight),
     subtitle: wrap(subtitleEl.textContent.trim(), EXPORT_TEXT.subtitle),
     note: noteEl ? wrap(noteEl.textContent.trim(), EXPORT_TEXT.note) : [],
-    caption: wrap(caption, EXPORT_TEXT.caption)
+    descriptions: descriptions.flatMap((d) => wrap(d, EXPORT_TEXT.descriptions)),
+    caption: wrap(caption, EXPORT_TEXT.caption),
+    footer: wrap(footer, EXPORT_TEXT.footer)
   };
   const layout = exportLayout(heights, Object.fromEntries(Object.entries(blocks).map(([k, v]) => [k, v.length])));
   const H = layout.height;
@@ -488,7 +509,9 @@ async function chartPng(el, caption) {
     svg.append(clone);
   });
   if (noteEl) text(blocks.note, layout.note, EXPORT_TEXT.note, { fill: muted });
+  if (blocks.descriptions.length) text(blocks.descriptions, layout.descriptions, EXPORT_TEXT.descriptions);
   text(blocks.caption, layout.caption, EXPORT_TEXT.caption, { fill: muted });
+  text(blocks.footer, layout.footer, EXPORT_TEXT.footer, { fill: muted });
 
   const img = new Image();
   img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}`;
@@ -546,19 +569,44 @@ async function inlineFonts(family, weights) {
 
 ```{=html}
 <style>
-.picker-group { margin-bottom: 0.75rem; }
-.picker-group legend { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; }
-.picker-item { display: block; font-size: 0.9rem; }
-.picker-item input:disabled + * , .picker-item:has(input:disabled) { opacity: 0.5; }
-.range { margin-top: 1rem; }
-.range-label { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; }
-.range-input { display: block; font-size: 0.85rem; margin-top: 0.5rem; }
-.radio-group { margin-top: 1rem; }
-.radio-group legend { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; }
-.radio-item { display: block; font-size: 0.9rem; }
+/* Full width: the explorer spans the whole screen, not Quarto's page column. */
+main.content.column-page, #title-block-header { grid-column: screen-start-inset / screen-end-inset; }
+/* Controls in a tinted, framed panel; the chart card below stays white. */
+.controls-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.5rem; margin-bottom: 1rem;
+  padding: 0.75rem 1.25rem; background: var(--bs-tertiary-bg, #f8f9fa); border: 1px solid var(--bs-border-color, #dee2e6);
+  border-radius: 0.5rem; }
+.controls-bar > * { margin: 0; }
+.controls-bar .cell, .controls-bar .cell-output-display { display: flex; align-items: center; gap: 0.5rem 1.5rem; flex-wrap: wrap; overflow: visible; }
+.controls-bar .cell-output-display:empty, .controls-bar .cell:has(.cell-output-display:empty) { display: none; }
+.control-label, .controls-bar legend { font-size: 0.85rem; font-weight: 600; margin: 0 0.5rem 0 0; }
+.controls-bar .cell:has(.picker) { flex-basis: 100%; padding-bottom: 0.75rem; border-bottom: 1px solid var(--bs-border-color, #dee2e6); margin-bottom: 0.25rem; }
+/* The chart with its descriptions, title and notes as one card. */
+.chart-card { border: 1px solid var(--bs-border-color, #dee2e6); border-radius: 0.5rem; padding: 1rem 1.25rem; margin-top: 0.5rem; }
+.chart-card > .cell:last-child .chart > :last-child { margin-bottom: 0; }
+.picker { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.25rem 1.5rem; }
+.picker-group { margin: 0; }
+.picker-group legend { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; float: none; width: auto; }
+.picker-item { display: inline-block; margin-right: 0.75rem; font-size: 0.9rem; white-space: nowrap; }
+.picker .btn { align-self: flex-end; }
+.picker-item:has(input:disabled) { opacity: 0.5; }
+.range { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.range-dates { font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.dual-range { position: relative; width: 16rem; height: 1.5rem; }
+.dual-range input[type=range] { position: absolute; inset: 0; width: 100%; margin: 0; background: none;
+  pointer-events: none; -webkit-appearance: none; appearance: none; z-index: 2; }
+.dual-range::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 4px; margin-top: -2px;
+  background: var(--bs-border-color, #dee2e6); border-radius: 2px; }
+.dual-range input[type=range]::-webkit-slider-thumb { pointer-events: auto; -webkit-appearance: none; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--bs-primary, #2780e3); border: 2px solid #fff; cursor: pointer; }
+.dual-range input[type=range]::-moz-range-thumb { pointer-events: auto; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--bs-primary, #2780e3); border: 2px solid #fff; cursor: pointer; }
+.dual-range input[type=range]::-moz-range-track { background: none; }
+.dual-range input[type=range]:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--bs-primary, #2780e3); outline-offset: 2px; }
+.radio-group { display: flex; align-items: center; gap: 0.75rem; margin: 0; }
+.radio-group legend, .export-group legend { float: left; width: auto; padding: 0; margin-bottom: 0; }
+.radio-item { font-size: 0.9rem; white-space: nowrap; }
 .radio-group.disabled { opacity: 0.5; }
-.export-group { margin-top: 1rem; }
-.export-group legend { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; }
+.export-group { display: flex; align-items: center; gap: 0.25rem; margin: 0; }
 .chart-title { font-size: 1.25rem; margin: 0; }
 .chart-subtitle { color: var(--bs-secondary-color, #6c757d); margin: 0 0 0.5rem; }
 .chart-note { font-size: 0.85rem; color: var(--bs-secondary-color, #6c757d); }

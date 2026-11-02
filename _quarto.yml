@@ -24,7 +24,8 @@ website:
         href: "https://github.com/mortenlorenzen/economic-series-explorer"
         text: GitHub
   page-footer:
-    center: "Data: Yahoo Finance, FRED · MIT licence"
+    left: "© 2026 Morten Lorenzen"
+    right: "Data: Yahoo Finance, FRED · MIT licence"
 
 format:
   html:

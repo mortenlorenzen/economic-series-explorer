@@ -10,7 +10,7 @@ import {
   exportRows, toCsv, exportFileName, todayLocal,
   sourceCaption, exportLayout, EXPORT_TEXT, wrapText, parseFontFaces, pickFontFaces,
   checkSeries, fetchSeries, loadAll, failureMessage,
-  descriptionNote,
+  descriptionNote, sliderBounds, dateToStep, stepToDate, pngFooter, descriptionLines,
 } from "../../js/series.js";
 
 test("level is indexed to 100 at the anchor", () => {
@@ -263,6 +263,8 @@ test("declutterValues on log works in log10 pixel positions", () => {
 test("formatActual and actualSubtitle", () => {
   assert.equal(formatActual(7580.07), "7580.07");
   assert.equal(formatEndLabel("S&P 500", 7580.07, "actual"), "S&P 500 (7580.07)");
+  assert.equal(formatEndLabel("Inflation Rate", 3.717251, "actual"), "Inflation Rate (3.72)");
+  assert.equal(formatEndLabel("10-Year Treasury", 4, "actual"), "10-Year Treasury (4.00)");
   assert.equal(actualSubtitle("Index points", "log"), "Index points, log scale");
 });
 
@@ -413,11 +415,26 @@ test("todayLocal uses the local calendar date", () => {
 });
 
 test("sourceCaption names sources by first appearance", () => {
-  assert.equal(
-    sourceCaption(["yahoo", "fred", "yahoo"]),
-    "Source: Yahoo Finance, FRED. Economic Series Explorer, mortenlorenzen.github.io/economic-series-explorer"
-  );
-  assert.match(sourceCaption(["bls"]), /^Source: bls\. /);
+  assert.equal(sourceCaption(["yahoo", "fred", "yahoo"]), "Source: Yahoo Finance, FRED.");
+  assert.equal(sourceCaption(["bls"]), "Source: bls.");
+});
+
+test("pngFooter has the date, site and copyright", () => {
+  assert.equal(pngFooter("2026-11-02"), "2026-11-02 · mortenlorenzen.github.io/economic-series-explorer · © 2026 Morten Lorenzen");
+});
+
+test("descriptionLines gives one line per series", () => {
+  assert.deepEqual(descriptionLines([{ name: "S&P 500", description: "Index." }, { name: "GDP", description: "Output." }]),
+    ["S&P 500: Index.", "GDP: Output."]);
+});
+
+test("exportLayout puts descriptions between the note and the caption, footer last", () => {
+  const plain = exportLayout([480]);
+  assert.equal(plain.descriptions, null);
+  assert.ok(plain.footer > plain.caption && plain.height > plain.footer);
+  const full = exportLayout([480], { note: 1, descriptions: 3 });
+  assert.ok(full.note < full.descriptions && full.descriptions < full.caption && full.caption < full.footer);
+  assert.equal(full.height - plain.height, EXPORT_TEXT.note.line + 3 * EXPORT_TEXT.descriptions.line + 4);
 });
 
 test("exportLayout stacks panels at their heights between header and caption", () => {
@@ -535,4 +552,17 @@ test("descriptionNote: more than two collapse with the names in the summary", ()
   assert.equal(three.collapsed, true);
   assert.equal(three.summary, "About the series: S&P 500, NASDAQ, Unemployment Rate");
   assert.equal(three.lines.length, 3);
+});
+
+test("slider steps are days from the earliest first_date", () => {
+  const reg = [{ first_date: "1948-01-01", last_date: "2026-09-01" }, { first_date: "1927-12-30", last_date: "2026-10-30" }];
+  const b = sliderBounds(reg);
+  assert.equal(b.min, "1927-12-30");
+  assert.equal(b.max, "2026-10-30");
+  assert.equal(stepToDate(0, b.min), "1927-12-30");
+  assert.equal(stepToDate(2, b.min), "1928-01-01");
+  assert.equal(stepToDate(b.steps, b.min), "2026-10-30");
+  for (const d of ["1927-12-30", "2000-02-29", "2016-10-30", "2026-10-30"]) {
+    assert.equal(stepToDate(dateToStep(d, b.min), b.min), d);
+  }
 });

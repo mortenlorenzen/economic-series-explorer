@@ -112,10 +112,11 @@ export function formatChange(plotted) {
   return `${rounded >= 0 ? "+" : ""}${rounded.toFixed(1)} pp`;
 }
 
-// kind: "level" or "rate" in indexed mode, "actual" in actual-values mode.
+// kind: "level" or "rate" in indexed mode, "actual" in actual-values mode
+// (2 decimals; the tooltip keeps the stored value).
 export function formatEndLabel(name, plotted, kind = "level") {
   const text = kind === "rate" ? formatChange(plotted)
-    : kind === "actual" ? formatActual(plotted)
+    : kind === "actual" ? plotted.toFixed(2)
     : plotted.toFixed(1);
   return `${name} (${text})`;
 }
@@ -361,28 +362,41 @@ export function todayLocal(now = new Date()) {
 }
 
 const SOURCE_NAMES = { yahoo: "Yahoo Finance", fred: "FRED" };
-export const SITE_CREDIT = "Economic Series Explorer, mortenlorenzen.github.io/economic-series-explorer";
+export const SITE_URL = "mortenlorenzen.github.io/economic-series-explorer";
+export const COPYRIGHT = "© 2026 Morten Lorenzen";
 
 // PNG caption: the exported series' sources by first appearance.
 export function sourceCaption(sources) {
   const names = [...new Set(sources)].map((s) => SOURCE_NAMES[s] ?? s);
-  return `Source: ${names.join(", ")}. ${SITE_CREDIT}`;
+  return `Source: ${names.join(", ")}.`;
+}
+
+// Last line of the PNG: export date, site, copyright.
+export function pngFooter(date) {
+  return `${date} · ${SITE_URL} · ${COPYRIGHT}`;
+}
+
+// PNG description lines, one per exported series.
+export function descriptionLines(series) {
+  return series.map((s) => `${s.name}: ${s.description}`);
 }
 
 // Vertical layout of the exported SVG: title, subtitle, the panels stacked
-// at their screen heights, the optional note and the caption. Text y values
-// are baselines.
+// at their screen heights, the optional note, the series descriptions, the
+// source caption and the footer line. Text y values are baselines.
 export const EXPORT_TEXT = {
   pad: 16,
   title: { size: 20, line: 28 },
   subtitle: { size: 14, line: 22 },
   note: { size: 12, line: 18 },
   caption: { size: 12, line: 18 },
+  descriptions: { size: 12, line: 18 },
+  footer: { size: 11, line: 16 },
 };
 
-// `lines` gives each text block's line count after wrapping; note 0 = no note.
-// Each text value is the first line's baseline.
-export function exportLayout(panelHeights, { title = 1, subtitle = 1, note = 0, caption = 1 } = {}) {
+// The options give each text block's line count after wrapping; note or
+// descriptions 0 = none. Each text value is the first line's baseline.
+export function exportLayout(panelHeights, { title = 1, subtitle = 1, note = 0, descriptions = 0, caption = 1, footer = 1 } = {}) {
   const { pad } = EXPORT_TEXT;
   let y = pad;
   const block = (t, n) => {
@@ -399,7 +413,10 @@ export function exportLayout(panelHeights, { title = 1, subtitle = 1, note = 0, 
   });
   out.note = note ? block(EXPORT_TEXT.note, note) : null;
   y += 4;
+  out.descriptions = descriptions ? block(EXPORT_TEXT.descriptions, descriptions) : null;
+  if (descriptions) y += 4;
   out.caption = block(EXPORT_TEXT.caption, caption);
+  out.footer = block(EXPORT_TEXT.footer, footer);
   out.height = y + pad;
   return out;
 }
@@ -505,4 +522,20 @@ export function descriptionNote(selected) {
   const lines = selected.map((s) => ({ name: s.name, description: s.description }));
   if (selected.length <= 2) return { collapsed: false, summary: null, lines };
   return { collapsed: true, summary: `About the series: ${selected.map((s) => s.name).join(", ")}`, lines };
+}
+
+// Date slider: one step per day from the earliest first_date to the latest
+// last_date in the registry.
+export function sliderBounds(registry) {
+  const min = registry.map((s) => s.first_date).reduce((a, b) => (b < a ? b : a));
+  const max = registry.map((s) => s.last_date).reduce((a, b) => (b > a ? b : a));
+  return { min, max, steps: dateToStep(max, min) };
+}
+
+export function dateToStep(date, min) {
+  return Math.round(daysBetween(min, date));
+}
+
+export function stepToDate(step, min) {
+  return new Date(Date.parse(`${min}T00:00:00Z`) + step * DAY_MS).toISOString().slice(0, 10);
 }

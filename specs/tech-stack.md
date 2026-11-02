@@ -54,3 +54,4 @@
 - 2026-11-02 — CLAUDE.md Test command is `./run-tests.sh` from the start; phase 1 creates it first.
 - 2026-11-02 — no lint/typecheck command; tests are the check.
 - 2026-11-02 — daily data reaches `main` through a PR that `update-data.yml` opens and squash-merges itself, because `protect-main` requires PRs and a personal repo can't add the GitHub Actions app as a bypass actor; chosen over a separate `data` branch (main would no longer hold current data). Replaces the same day's direct-push decision.
+- 2026-11-02 — owner's tweaks (`specs/2026-11-02-tweaks/`): all controls in a top bar instead of the sidebar, for a full-width chart, with the series as always-visible checkboxes (a dropdown was tried and dropped); a two-handle date slider replaces the From/To inputs; the PNG always lists every series description and ends with date · URL · © 2026 Morten Lorenzen; actual end labels at 2 decimals.
