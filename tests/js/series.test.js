@@ -5,7 +5,7 @@ import {
   anchorAndIndex, colorFor, formatEndLabel, yDomain, declutter, declutterValues,
   canSelect, formatChange, panelHeights, PANELS, shownKinds, chartSubtitle,
   displayMode, logScale, actualPoints, formatActual, actualSubtitle, actualAxis,
-  createLoader,
+  createLoader, isDaily, isoWeekKey, windowOverTenYears, downsampleWeekly,
 } from "../../js/series.js";
 
 test("level is indexed to 100 at the anchor", () => {
@@ -285,4 +285,55 @@ test("createLoader retries an id whose fetch failed", async () => {
   fail = false;
   assert.deepEqual(await load("gdp"), { id: "gdp" });
   assert.equal(calls, 2);
+});
+
+test("isDaily: trading days yes, month and quarter starts no", () => {
+  assert.equal(isDaily(["2020-01-02", "2020-01-03", "2020-01-06", "2020-01-07", "2020-01-08"]), true);
+  assert.equal(isDaily(["2020-01-01", "2020-02-01", "2020-03-01", "2020-04-01"]), false);
+  assert.equal(isDaily(["2020-01-01", "2020-04-01", "2020-07-01"]), false);
+  assert.equal(isDaily(["2020-01-01"]), false);
+});
+
+test("isoWeekKey follows ISO 8601 across the year boundary", () => {
+  assert.equal(isoWeekKey("2020-12-31"), "2020-W53");
+  assert.equal(isoWeekKey("2021-01-03"), "2020-W53");
+  assert.equal(isoWeekKey("2021-01-04"), "2021-W01");
+  assert.equal(isoWeekKey("2019-12-30"), "2020-W01");
+  assert.equal(isoWeekKey("2026-10-30"), "2026-W44");
+});
+
+test("windowOverTenYears is strict", () => {
+  assert.equal(windowOverTenYears("2016-10-30", "2026-10-30"), false);
+  assert.equal(windowOverTenYears("2016-10-29", "2026-10-30"), true);
+});
+
+const pt = (date, plotted, value = plotted) => ({ date, value, plotted });
+
+test("downsampleWeekly averages each week at its last date and keeps the ends exact", () => {
+  const points = [
+    pt("2020-01-06", 100, 50), pt("2020-01-07", 102, 51), pt("2020-01-08", 104, 52),
+    pt("2020-01-13", 110, 55), pt("2020-01-14", 112, 56), pt("2020-01-15", 120, 60),
+  ];
+  assert.deepEqual(downsampleWeekly(points), [
+    pt("2020-01-06", 100, 50),
+    { date: "2020-01-08", value: 51.5, plotted: 103, weekly: true },
+    { date: "2020-01-14", value: 55.5, plotted: 111, weekly: true },
+    pt("2020-01-15", 120, 60),
+  ]);
+});
+
+test("downsampleWeekly keeps a Wednesday anchor as its own point", () => {
+  const points = [
+    pt("2020-01-08", 100), pt("2020-01-09", 104), pt("2020-01-10", 106),
+    pt("2020-01-13", 90), pt("2020-01-14", 95),
+  ];
+  const out = downsampleWeekly(points);
+  assert.deepEqual(out[0], pt("2020-01-08", 100));
+  assert.deepEqual(out[1], { date: "2020-01-10", value: 105, plotted: 105, weekly: true });
+  assert.deepEqual(out.at(-1), pt("2020-01-14", 95));
+  assert.equal(out.length, 4);
+});
+
+test("downsampleWeekly leaves two points or fewer alone", () => {
+  assert.deepEqual(downsampleWeekly([pt("2020-01-06", 1), pt("2020-01-07", 2)]), [pt("2020-01-06", 1), pt("2020-01-07", 2)]);
 });
