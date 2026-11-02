@@ -7,10 +7,19 @@ registry_columns <- c(
   "unit", "max_stale_days", "description"
 )
 
+sources <- c("yahoo", "fred")
+kinds <- c("level", "rate")
+
+# Transform functions by name, each (df) -> df. Adding one is one entry.
+transforms <- list(
+  none = function(df) df
+)
+
 read_registry <- function(path = "series.csv") {
   reg <- readr::read_csv(
     path,
     col_types = readr::cols(.default = "c"),
+    na = character(),
     progress = FALSE
   )
   if (!identical(names(reg), registry_columns)) {
@@ -20,8 +29,37 @@ read_registry <- function(path = "series.csv") {
       call. = FALSE
     )
   }
+  reg <- as.data.frame(reg)
+  validate_registry(reg)
   reg$max_stale_days <- as.numeric(reg$max_stale_days)
-  as.data.frame(reg)
+  reg
+}
+
+# Stops with every problem in the registry at once, one line per problem.
+validate_registry <- function(reg) {
+  problems <- character()
+  add <- function(i, msg) {
+    problems[length(problems) + 1] <<- paste0("row ", i, " (", reg$id[i], "): ", msg)
+  }
+  dup <- duplicated(reg$id)
+  stale <- suppressWarnings(as.numeric(reg$max_stale_days))
+  for (i in seq_len(nrow(reg))) {
+    if (!grepl("^[a-z0-9_]+$", reg$id[i])) add(i, "id must be lowercase letters, digits or _")
+    if (dup[i]) add(i, "duplicate id")
+    if (!reg$source[i] %in% sources) add(i, paste0("unknown source '", reg$source[i], "'"))
+    if (!reg$kind[i] %in% kinds) add(i, paste0("unknown kind '", reg$kind[i], "'"))
+    if (!reg$transform[i] %in% names(transforms)) {
+      add(i, paste0("unknown transform '", reg$transform[i], "'"))
+    }
+    if (is.na(stale[i]) || stale[i] <= 0) add(i, "max_stale_days must be a number above 0")
+    for (col in c("name", "category", "symbol", "unit", "description")) {
+      if (trimws(reg[[col]][i]) == "") add(i, paste0(col, " is empty"))
+    }
+  }
+  if (length(problems)) {
+    stop("invalid series.csv:\n", paste(problems, collapse = "\n"), call. = FALSE)
+  }
+  invisible(reg)
 }
 
 # Full available history as a data frame of date and value.

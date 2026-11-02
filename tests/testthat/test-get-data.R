@@ -20,6 +20,22 @@ test_that("the real series.csv is a valid registry", {
   expect_true("sp500" %in% reg$id)
 })
 
+test_that("validate_registry reports every problem with its row", {
+  err <- tryCatch(read_registry(fixture("registry_invalid.csv")), error = conditionMessage)
+  expected <- c(
+    "row 2 (good): duplicate id",
+    "row 3 (Bad Id): id must be lowercase",
+    "row 4 (src): unknown source 'bloomberg'",
+    "row 5 (knd): unknown kind 'ratio'",
+    "row 6 (trf): unknown transform 'cube'",
+    "row 7 (stl): max_stale_days must be a number above 0",
+    "row 8 (zer): max_stale_days must be a number above 0",
+    "row 9 (nam): name is empty"
+  )
+  for (e in expected) expect_match(err, e, fixed = TRUE)
+  expect_false(grepl("row 1 ", err, fixed = TRUE))
+})
+
 test_that("clean_series drops NA and duplicate dates and sorts", {
   df <- clean_series(read_raw_fixture("sp500_raw.csv"), "sp500")
   expect_equal(format(df$date), c("1927-12-30", "1928-01-03", "1928-01-04", "1928-01-06"))

@@ -1,0 +1,10 @@
+id,name,category,source,symbol,kind,transform,unit,max_stale_days,description
+good,Good,Markets,yahoo,^GSPC,level,none,Index points,7,Fine.
+good,Duplicate,Markets,yahoo,^DJI,level,none,Index points,7,Fine.
+Bad Id,Bad id,Markets,yahoo,^IXIC,level,none,Index points,7,Fine.
+src,Source,Markets,bloomberg,X,level,none,Index points,7,Fine.
+knd,Kind,Markets,fred,X,ratio,none,Index points,7,Fine.
+trf,Transform,Markets,fred,X,rate,cube,Percent,7,Fine.
+stl,Stale,Markets,fred,X,rate,none,Percent,soon,Fine.
+zer,Zero,Markets,fred,X,rate,none,Percent,0,Fine.
+nam,,Markets,fred,X,rate,none,Percent,7,Fine.
