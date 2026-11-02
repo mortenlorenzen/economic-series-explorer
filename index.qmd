@@ -10,7 +10,7 @@ format:
 import {
   toRows, presetRange, PRESETS, effectiveStart, anchorAndIndex, colorFor,
   formatEndLabel, formatChange, yDomain, declutterValues, canSelect,
-  PANELS, panelHeights
+  PANELS, panelHeights, shownKinds, chartSubtitle
 } from "./js/series.js"
 
 registry = (await fetch("data/series.json")).json()
@@ -141,13 +141,8 @@ indexed = loaded.map((series) => ({ series, result: anchorAndIndex(series, win.s
   const note = leftOut.length
     ? html`<p class="chart-note">Left out (no data within 180 days of ${win.start}): ${leftOut.join(", ")}</p>`
     : "";
-  const kinds = PANELS.map((p) => p.kind).filter((k) => shown.some((d) => d.series.kind === k));
-  const parts = [];
-  if (kinds.includes("level")) parts.push(`100 = value on ${win.start}`);
-  if (kinds.includes("rate")) parts.push("rates as change in percentage points");
-  let subtitle = parts.join("; ");
-  subtitle = subtitle.charAt(0).toUpperCase() + subtitle.slice(1);
-  if (win.mover) subtitle += `. Window starts ${win.start}, when ${win.mover.name} data begins`;
+  const kinds = shownKinds(shown.map((d) => d.series));
+  const subtitle = chartSubtitle(kinds, win.start, win.mover);
   const header = html`<div class="chart-header">
     <h2 class="chart-title">Indexed performance since ${win.start}</h2>
     <p class="chart-subtitle">${subtitle}</p>

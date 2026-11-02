@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   plottedValue, toRows, shiftYears, presetRange, effectiveStart,
   anchorAndIndex, colorFor, formatEndLabel, yDomain, declutter, declutterValues,
-  canSelect, formatChange, panelHeights, PANELS,
+  canSelect, formatChange, panelHeights, PANELS, shownKinds, chartSubtitle,
 } from "../../js/series.js";
 
 test("level is indexed to 100 at the anchor", () => {
@@ -158,6 +158,7 @@ test("rate end labels carry a sign and pp, without -0.0", () => {
   assert.equal(formatEndLabel("Unemployment Rate", 1.24, "rate"), "Unemployment Rate (+1.2 pp)");
   assert.equal(formatEndLabel("Inflation Rate", -0.43, "rate"), "Inflation Rate (-0.4 pp)");
   assert.equal(formatChange(-0.04), "+0.0 pp");
+  assert.equal(formatEndLabel("Inflation Rate", -0.04, "rate"), "Inflation Rate (+0.0 pp)");
   assert.equal(formatEndLabel("S&P 500", 184.26, "level"), "S&P 500 (184.3)");
 });
 
@@ -173,4 +174,21 @@ test("PANELS puts levels on top with their labels and reference lines", () => {
     ["level", "Index, start = 100", 100],
     ["rate", "Change, percentage points", 0],
   ]);
+});
+
+test("shownKinds keeps panel order and ignores kinds with no shown series", () => {
+  assert.deepEqual(shownKinds([{ kind: "rate" }, { kind: "level" }]), ["level", "rate"]);
+  assert.deepEqual(shownKinds([{ kind: "rate" }]), ["rate"]);
+  assert.deepEqual(shownKinds([]), []);
+});
+
+test("chartSubtitle joins the parts that apply", () => {
+  assert.equal(chartSubtitle(["level", "rate"], "2016-10-30", null),
+    "100 = value on 2016-10-30; rates as change in percentage points");
+  assert.equal(chartSubtitle(["level"], "2016-10-30", null), "100 = value on 2016-10-30");
+  assert.equal(chartSubtitle(["rate"], "2016-10-30", null), "Rates as change in percentage points");
+  assert.equal(chartSubtitle(["level"], "1992-01-02", { name: "Dow Jones" }),
+    "100 = value on 1992-01-02. Window starts 1992-01-02, when Dow Jones data begins");
+  assert.equal(chartSubtitle([], "1992-01-02", { name: "Dow Jones" }),
+    "Window starts 1992-01-02, when Dow Jones data begins");
 });

@@ -7,7 +7,7 @@
 ## Decisions
 - The picker lists every series in `series.json`, which removes the phase 5 level-only filter. Grouping, order, max 8 and defaults are unchanged.
 - `rate` plotted value = `value − anchor` in percentage points (`plottedValue("rate", …)`), so a rate series starts at 0. Anchor, 180-day rule and effective start are as in phase 5 and shared by both kinds.
-- **Panels**, in a fixed order: levels on top, rates below.
+- **Panels**, in a fixed order: levels on top, rates below. `shownKinds()` and `chartSubtitle()` in `js/series.js` pick the panels and build the subtitle.
 
   | Panel | y label | Reference line |
   |---|---|---|
@@ -15,7 +15,7 @@
   | Rates (`rate`) | "Change, percentage points" | 0 |
 
   - A panel is drawn only if at least one *shown* (not left-out) series has that kind.
-- **Heights**: 480 px of plot height in total. With both panels, levels get 60% (288 px) and rates 40% (192 px); one panel gets all 480.
+- **Heights**: 480 px of SVG height in total (Plot's `height`, margins included). With both panels, levels get 60% (288 px) and rates 40% (192 px); one panel gets all 480.
 - **Alignment**: both panels use the same x-domain [effective start, To], the same width, and the same left (56 px) and right (170 px) margins, so dates line up vertically. With two panels, only the bottom panel draws x tick labels; the top panel's bottom margin shrinks to 8 px.
 - **End labels per panel**, decluttered within that panel's own plot area:
   - Levels as phase 5: "S&P 500 (184.3)".
@@ -26,7 +26,7 @@
 - **Subtitle**: the parts that apply, joined with "; ":
   - "100 = value on <start>" when levels are shown;
   - "rates as change in percentage points" when rates are shown, capitalised when it comes first;
-  - then the window-start sentence from phase 5 when a series moved the start.
+  - when a series moved the start, phase 5's sentence follows as its own sentence (". Window starts <start>, when <name> data begins"), not joined with "; ".
   - Both kinds give BRIEF §6.6's "100 = value on <start>; rates as change in percentage points".
 - Colours unchanged: registry index, Observable10 wrapping after ten. debt_gdp (index 10) shares sp500's colour but always sits in the other panel.
 
@@ -62,3 +62,8 @@
 #### Scenario: subtitle
 - WHEN both kinds are shown
 - THEN the subtitle reads "100 = value on <start>; rates as change in percentage points"
+
+### Requirement: Panels and subtitle from shown series
+#### Scenario: left-out kind
+- WHEN the only rate series is left out
+- THEN `shownKinds` returns only "level" and the subtitle has no rates part

@@ -122,6 +122,24 @@ export const PANELS = [
   { kind: "rate", label: "Change, percentage points", reference: 0 },
 ];
 
+// Kinds that get a panel, in panel order: those with at least one shown
+// (not left-out) series.
+export function shownKinds(shownSeries) {
+  return PANELS.map((p) => p.kind).filter((k) => shownSeries.some((s) => s.kind === k));
+}
+
+// "100 = value on <start>; rates as change in percentage points" for the
+// kinds shown, then the sentence naming the series that moved the start.
+export function chartSubtitle(kinds, start, mover) {
+  const parts = [];
+  if (kinds.includes("level")) parts.push(`100 = value on ${start}`);
+  if (kinds.includes("rate")) parts.push("rates as change in percentage points");
+  let text = parts.join("; ");
+  text = text.charAt(0).toUpperCase() + text.slice(1);
+  if (mover) text += `${text ? ". " : ""}Window starts ${start}, when ${mover.name} data begins`;
+  return text;
+}
+
 export const PLOT_HEIGHT = 480;
 export const LEVEL_SHARE = 0.6;
 
