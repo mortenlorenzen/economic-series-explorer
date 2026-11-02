@@ -359,3 +359,91 @@ export function todayLocal(now = new Date()) {
   const pad = (n) => String(n).padStart(2, "0");
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
+
+const SOURCE_NAMES = { yahoo: "Yahoo Finance", fred: "FRED" };
+export const SITE_CREDIT = "Economic Series Explorer, mortenlorenzen.github.io/economic-series-explorer";
+
+// PNG caption: the exported series' sources by first appearance.
+export function sourceCaption(sources) {
+  const names = [...new Set(sources)].map((s) => SOURCE_NAMES[s] ?? s);
+  return `Source: ${names.join(", ")}. ${SITE_CREDIT}`;
+}
+
+// Vertical layout of the exported SVG: title, subtitle, the panels stacked
+// at their screen heights, the optional note and the caption. Text y values
+// are baselines.
+export const EXPORT_TEXT = {
+  pad: 16,
+  title: { size: 20, line: 28 },
+  subtitle: { size: 14, line: 22 },
+  note: { size: 12, line: 18 },
+  caption: { size: 12, line: 18 },
+};
+
+export function exportLayout(panelHeights, { note = false } = {}) {
+  const { pad, title, subtitle, note: noteText, caption } = EXPORT_TEXT;
+  let y = pad;
+  const baseline = (t) => {
+    const b = y + t.line - (t.line - t.size) / 2 - Math.round(t.size * 0.2);
+    y += t.line;
+    return b;
+  };
+  const out = { title: baseline(title), subtitle: baseline(subtitle) };
+  y += 4;
+  out.panels = panelHeights.map((h) => {
+    const top = y;
+    y += h;
+    return top;
+  });
+  out.note = note ? baseline(noteText) : null;
+  y += 4;
+  out.caption = baseline(caption);
+  out.height = y + pad;
+  return out;
+}
+
+// @font-face rules in a stylesheet's text, as {family, style, weight,
+// unicodeRange, url}. Only the first url() of each src is kept.
+export function parseFontFaces(cssText) {
+  const faces = [];
+  for (const [, body] of cssText.matchAll(/@font-face\s*\{([^}]*)\}/g)) {
+    const prop = (name) => body.match(new RegExp(`(?:^|;)\\s*${name}\\s*:\\s*([^;]+)`))?.[1].trim() ?? null;
+    const url = body.match(/url\(\s*(['"]?)([^'")]+)\1\s*\)/)?.[2];
+    if (!url) continue;
+    faces.push({
+      family: (prop("font-family") ?? "").replace(/^['"]|['"]$/g, ""),
+      style: prop("font-style") ?? "normal",
+      weight: prop("font-weight") ?? "400",
+      unicodeRange: prop("unicode-range"),
+      url,
+    });
+  }
+  return faces;
+}
+
+// Does a unicode-range list cover a code point? No range covers everything.
+function coversCodePoint(range, cp) {
+  if (!range) return true;
+  return range.split(",").some((part) => {
+    const [a, b] = part.trim().replace(/^U\+/i, "").split("-");
+    if (a.includes("?")) {
+      return cp >= parseInt(a.replace(/\?/g, "0"), 16) && cp <= parseInt(a.replace(/\?/g, "F"), 16);
+    }
+    return cp >= parseInt(a, 16) && cp <= parseInt(b ?? a, 16);
+  });
+}
+
+// The faces to inline: normal style, the given family, one latin face (the
+// one covering "A") per wanted weight. A weight range "300 700" covers 400.
+export function pickFontFaces(faces, family, weights) {
+  const picked = [];
+  for (const w of weights) {
+    const face = faces.find((f) => {
+      const [lo, hi = lo] = f.weight.split(/\s+/).map(Number);
+      return f.family.toLowerCase() === family.toLowerCase() && f.style === "normal" &&
+        lo <= w && w <= hi && coversCodePoint(f.unicodeRange, 0x41);
+    });
+    if (face && !picked.includes(face)) picked.push(face);
+  }
+  return picked;
+}

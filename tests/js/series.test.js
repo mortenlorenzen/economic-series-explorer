@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   plottedValue, toRows, shiftYears, presetRange, effectiveStart,
   anchorAndIndex, colorFor, formatEndLabel, yDomain, declutter, declutterValues,
@@ -7,6 +8,7 @@ import {
   displayMode, logScale, actualPoints, formatActual, actualSubtitle, actualAxis,
   createLoader, isDaily, isoWeekKey, windowOverTenYears, downsampleWeekly,
   exportRows, toCsv, exportFileName, todayLocal,
+  sourceCaption, exportLayout, EXPORT_TEXT, parseFontFaces, pickFontFaces,
 } from "../../js/series.js";
 
 test("level is indexed to 100 at the anchor", () => {
@@ -406,4 +408,51 @@ test("exportFileName matches the brief's example", () => {
 
 test("todayLocal uses the local calendar date", () => {
   assert.equal(todayLocal(new Date(2026, 0, 5, 23, 59)), "2026-01-05");
+});
+
+test("sourceCaption names sources by first appearance", () => {
+  assert.equal(
+    sourceCaption(["yahoo", "fred", "yahoo"]),
+    "Source: Yahoo Finance, FRED. Economic Series Explorer, mortenlorenzen.github.io/economic-series-explorer"
+  );
+  assert.match(sourceCaption(["bls"]), /^Source: bls\. /);
+});
+
+test("exportLayout stacks panels at their heights between header and caption", () => {
+  const one = exportLayout([480]);
+  assert.ok(one.title < one.subtitle && one.subtitle < one.panels[0]);
+  assert.equal(one.note, null);
+  assert.ok(one.caption > one.panels[0] + 480);
+  assert.ok(one.height > one.caption);
+  const two = exportLayout([288, 192], { note: true });
+  assert.equal(two.panels[1], two.panels[0] + 288);
+  assert.ok(two.note > two.panels[1] + 192 && two.caption > two.note);
+  assert.equal(two.height - one.height, EXPORT_TEXT.note.line);
+});
+
+const fontCss = readFileSync(new URL("../fixtures/google_fonts.css", import.meta.url), "utf8");
+
+test("parseFontFaces reads family, style, weight, range and url", () => {
+  const faces = parseFontFaces(fontCss);
+  assert.equal(faces.length, 6);
+  assert.deepEqual(faces[2], {
+    family: "Source Sans Pro", style: "normal", weight: "400",
+    unicodeRange: "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+    url: "https://fonts.gstatic.com/s/sourcesanspro/v22/6xK3dSBYKcSV-LCoeQqfX1RYOo3qOK7l.woff2",
+  });
+  assert.equal(faces[5].url, "other.woff2");
+  assert.equal(faces[5].unicodeRange, null);
+});
+
+test("pickFontFaces keeps only the latin normal face per weight", () => {
+  const picked = pickFontFaces(parseFontFaces(fontCss), "source sans pro", [400, 700, 400]);
+  assert.deepEqual(picked.map((f) => f.url.split("/").pop()), [
+    "6xK3dSBYKcSV-LCoeQqfX1RYOo3qOK7l.woff2", "6xKydSBYKcSV-LCoeQqfX1RYOo3ig4vwlxdu.woff2",
+  ]);
+  assert.deepEqual(pickFontFaces(parseFontFaces(fontCss), "Source Sans Pro", [300]), []);
+});
+
+test("pickFontFaces accepts a variable-font weight range", () => {
+  const faces = parseFontFaces("@font-face{font-family:\"V\";font-weight:300 700;src:url(v.woff2)}");
+  assert.equal(pickFontFaces(faces, "V", [400]).length, 1);
 });
