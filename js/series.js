@@ -112,10 +112,11 @@ export function formatChange(plotted) {
   return `${rounded >= 0 ? "+" : ""}${rounded.toFixed(1)} pp`;
 }
 
-// kind: "level" or "rate" in indexed mode, "actual" in actual-values mode.
+// kind: "level" or "rate" in indexed mode, "actual" in actual-values mode
+// (2 decimals; the tooltip keeps the stored value).
 export function formatEndLabel(name, plotted, kind = "level") {
   const text = kind === "rate" ? formatChange(plotted)
-    : kind === "actual" ? formatActual(plotted)
+    : kind === "actual" ? plotted.toFixed(2)
     : plotted.toFixed(1);
   return `${name} (${text})`;
 }

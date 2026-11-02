@@ -263,6 +263,8 @@ test("declutterValues on log works in log10 pixel positions", () => {
 test("formatActual and actualSubtitle", () => {
   assert.equal(formatActual(7580.07), "7580.07");
   assert.equal(formatEndLabel("S&P 500", 7580.07, "actual"), "S&P 500 (7580.07)");
+  assert.equal(formatEndLabel("Inflation Rate", 3.717251, "actual"), "Inflation Rate (3.72)");
+  assert.equal(formatEndLabel("10-Year Treasury", 4, "actual"), "10-Year Treasury (4.00)");
   assert.equal(actualSubtitle("Index points", "log"), "Index points, log scale");
 });
 
