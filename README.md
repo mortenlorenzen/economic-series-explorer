@@ -100,6 +100,7 @@ Claude Code deletes the row in `series.csv` and the series' file `data/<id>.json
 | `tests/` | testthat and `node --test` tests, with `fixtures/` |
 | `specs/` | Mission, tech stack, roadmap and one spec folder per feature |
 | `BRIEF.md` | The original product brief (kept as written; `specs/` supersedes it) |
+| `BRIEF2.md` | The brief as built: the current app, kept in line with it (`specs/` wins where they differ) |
 
 ## Development
 

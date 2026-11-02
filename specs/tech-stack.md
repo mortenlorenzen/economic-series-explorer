@@ -18,7 +18,8 @@
 ## Conventions not visible in code
 - `get_data.R` names no series itself; everything comes from `series.csv`.
 - Fetching and transforming are separate functions, so tests run transform and validation on saved fixtures.
-- Colours are assigned by registry order (Observable10), so a series keeps its colour when others are toggled.
+- Colours are assigned by registry order (Observable10), so a series keeps its colour when others are toggled; when two selected series would share a colour, the later one takes the first free colour.
+- `BRIEF.md` is the original brief and is never edited; `BRIEF2.md` describes the app as built, and a change that alters what it describes updates it in the same branch.
 - Indexing, anchoring and downsampling live in `js/series.js` as pure functions that `index.qmd` imports.
 - The browser fetches only files in `data/`.
 - No code, text or styling from potus-econ-scorecard.
@@ -56,3 +57,4 @@
 - 2026-11-02 — daily data reaches `main` through a PR that `update-data.yml` opens and squash-merges itself, because `protect-main` requires PRs and a personal repo can't add the GitHub Actions app as a bypass actor; chosen over a separate `data` branch (main would no longer hold current data). Replaces the same day's direct-push decision.
 - 2026-11-02 — owner's tweaks (`specs/2026-11-02-tweaks/`): all controls in a top bar instead of the sidebar, for a full-width chart, with the series as always-visible checkboxes (a dropdown was tried and dropped); a two-handle date slider replaces the From/To inputs; the PNG always lists every series description and ends with date · URL · © 2026 Morten Lorenzen; actual end labels at 2 decimals.
 - 2026-11-02 — nine more series (`specs/2026-11-02-more-series/`): Hang Seng, CSI 300 tracker, MSCI ACWI ETF, gold, WTI oil, copper (`PCOPPUSDM`; "Copper" is no FRED id), Bitcoin, Danish HICP (`CP0000DKM086NEST`; the OECD CPI stopped in 2025) and the federal funds rate; new categories Commodities and Crypto; colours re-assigned on a clash so selected lines never share one.
+- 2026-11-02 — a second brief, `BRIEF2.md`, describes the app as built, while `BRIEF.md` stays the untouched original: the owner wants a brief that matches the current app, and the original stays readable next to it. specs/ still wins where they differ.
