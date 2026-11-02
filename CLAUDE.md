@@ -13,7 +13,7 @@
 ## Specs
 This project uses spec-driven development.
 - BRIEF.md, if present, is the original product brief: input for writing specs, never edited.
-- BRIEF2.md describes the app as built: a change that alters what it describes updates it in the same branch. Where specs/ and either brief disagree, specs/ wins.
+- BRIEF-AS-BUILT.md describes the app as built: a change that alters what it describes updates it in the same branch. Where specs/ and either brief disagree, specs/ wins.
 - Read specs/mission.md, specs/tech-stack.md and specs/roadmap.md before any feature work.
 - Feature specs live in specs/YYYY-MM-DD-feature-name/ (plan.md, requirements.md, validation.md).
 - When writing spec files, use the headings in specs/_templates/.

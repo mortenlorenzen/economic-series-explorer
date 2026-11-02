@@ -5,7 +5,7 @@ updated: 2026-11-02
 source: "BRIEF.md, specs/"
 ---
 
-# Economic Series Explorer — Brief 2 (as built)
+# Economic Series Explorer — Brief (as built)
 
 <!--
 BRIEF.md is the original brief and stays as written. This file describes the app
