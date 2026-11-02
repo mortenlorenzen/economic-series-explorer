@@ -17,6 +17,7 @@ Very small phases. Each phase = one branch = one `specs/YYYY-MM-DD-feature-name/
 ## After the roadmap
 - [x] Tweaks — top bar with always-visible series checkboxes, two-handle date slider instead of From/To, PNG descriptions and footer line, actual end labels at 2 decimals, About and footer text (`specs/2026-11-02-tweaks/`)
 - [x] More series — nine more series (twenty in all), categories Commodities and Crypto, colours re-assigned on a clash (`specs/2026-11-02-more-series/`)
+- [x] R code style — `get_data.R` in tidyverse style, same output (`specs/2026-11-02-r-style/`)
 
 ## Later / maybe
 - BRIEF §6.8: further series, more transforms, recession shading, shareable URLs, common-frequency resampling.

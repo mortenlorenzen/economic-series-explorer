@@ -52,7 +52,7 @@ A static web app for comparing economic time series on a shared date axis.
 | Layer | Choice | Version | Why |
 |---|---|---|---|
 | Data pipeline | R script `get_data.R` | R 4.6.1 | Good fetchers for FRED and Yahoo |
-| R packages | quantmod (Yahoo), httr2 + readr (FRED CSV), jsonlite, testthat; pinned with renv | see `renv.lock` | CI installs exactly the local versions |
+| R packages | quantmod (Yahoo), httr2 + readr (FRED CSV), dplyr + purrr, jsonlite, testthat; pinned with renv | see `renv.lock` | CI installs exactly the local versions |
 | Site | Quarto, rendered to GitHub Pages | Quarto 1.10.19 | Static site, OJS built in |
 | Front end | Observable JS + Observable Plot inside `index.qmd` | as bundled with Quarto (Plot 0.6.11) | Reactive controls without a JS build step |
 | JS logic + tests | Plain ES module `js/series.js`, `node --test` | Node 26.8.1 | Testable outside the browser |
@@ -67,6 +67,7 @@ Constraints:
 - Expected size: ~500 KB for the longest daily series, 1–3 MB for all of `data/`.
 
 Conventions not visible in code:
+- R code: tidyverse (dplyr, purrr, readr, tibble), native pipe `|>`, `<-` assignment, snake_case.
 - The R script names no series itself; everything comes from `series.csv`.
 - Colours are assigned by registry order, so a series keeps its colour when others are toggled; only when two selected series would share a colour does the later one take the first free colour (§6.6).
 - Indexing, anchoring, downsampling, colours and export logic live in a plain JS module (`js/series.js`) that `index.qmd` imports, so they can be tested outside the browser.
@@ -95,6 +96,7 @@ Built in eleven phases plus two follow-ups; every phase left the deployed site w
 - [x] Phase 11 — Description note, about page and site metadata (§6.6, §6.9)
 - [x] Tweaks — top bar with series checkboxes, date slider, PNG descriptions and footer, actual end labels at 2 decimals, About and footer text (§6.4, §6.6, §6.7)
 - [x] More series — nine more series and the colour clash rule (§6.1, §6.6)
+- [x] R code style — `get_data.R` rewritten in tidyverse style with byte-identical output (§3)
 
 ## 6. Product design
 
@@ -286,6 +288,7 @@ File name: `<ids joined by +>_<mode>_<from>_<to>_<today>.csv`, e.g. `sp500+nasda
 - Daily data reaches `main` through a PR the workflow opens and merges itself — a personal repo can't let GitHub Actions bypass the PR rule.
 - All controls in a top bar, series as always-visible checkboxes, a two-handle date slider instead of From/To inputs — a full-width chart (owner's tweaks).
 - Twenty series instead of eleven; colours re-assigned on a clash so selected lines never share one.
+- R code in tidyverse style (`|>`, `<-`, snake_case); FRED stays on httr2, because quantmod's FRED method fails without an API key and a key secret isn't worth it.
 - BRIEF.md stays as the original; this file describes the app as built.
 
 ## 8. Links

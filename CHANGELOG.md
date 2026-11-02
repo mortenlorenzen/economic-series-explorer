@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-11-02
+- R code style: `get_data.R` rewritten with dplyr, purrr and the native pipe; output unchanged
 - More series: Hang Seng, CSI 300 China Tracker, MSCI AC World ETF, Gold, Crude Oil (WTI), Copper, Bitcoin, Consumer Prices Denmark and the Federal Funds Rate; selected lines never share a colour
 - Tweaks: controls in a top bar over a full-width chart, series checkboxes in one row, two-handle date slider, PNG with series descriptions and a date · URL · © line, actual end labels at 2 decimals, About and footer text
 - Phase 11: series descriptions above the chart (collapsed past two series), About page with sources and credit, navbar About and GitHub links, site description, Open Graph and footer
