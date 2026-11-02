@@ -14,6 +14,10 @@ Very small phases. Each phase = one branch = one `specs/YYYY-MM-DD-feature-name/
 - [x] Phase 10 — Edge cases (covers BRIEF §6.7 table)
 - [x] Phase 11 — Description note, about page and site metadata (covers BRIEF §6.6 Description note, §6.9 about.qmd, _quarto.yml)
 
+## After the roadmap
+- [x] Tweaks — top bar with always-visible series checkboxes, two-handle date slider instead of From/To, PNG descriptions and footer line, actual end labels at 2 decimals, About and footer text (`specs/2026-11-02-tweaks/`)
+- [x] More series — nine more series (twenty in all), categories Commodities and Crypto, colours re-assigned on a clash (`specs/2026-11-02-more-series/`)
+
 ## Later / maybe
-- BRIEF §6.8: more series, more transforms, recession shading, shareable URLs, common-frequency resampling.
+- BRIEF §6.8: further series, more transforms, recession shading, shareable URLs, common-frequency resampling.
 - See `specs/research/`
