@@ -7,7 +7,7 @@
 - [ ] Lint/typecheck: none
 
 ## Manual
-- [ ] Before merge: `gh api repos/mortenlorenzen/economic-series-explorer/rulesets/26329324 -q .bypass_actors` lists the GitHub Actions app (integration)
+- [ ] Before merge: `gh api repos/mortenlorenzen/economic-series-explorer/rulesets/26329324 -q .bypass_actors` lists the GitHub Actions app (`actor_type: Integration`) with `bypass_mode: always` (`pull_request` mode would still reject the direct push)
 - [ ] After merge: run "Update data" with workflow_dispatch → green; commit on `main` only if data changed
 - [ ] "Build site" runs from the `workflow_run` trigger and deploys
 - [ ] The next scheduled 06:00 UTC run is green
