@@ -11,7 +11,7 @@ import {
   toRows, presetRange, PRESETS, effectiveStart, anchorAndIndex, colorFor,
   formatEndLabel, formatChange, yDomain, declutterValues, canSelect,
   PANELS, panelHeights, shownKinds, chartSubtitle,
-  displayMode, DISPLAY_REASON, logScale, actualPoints, actualSubtitle
+  displayMode, DISPLAY_REASON, logScale, actualPoints, actualSubtitle, actualAxis
 } from "./js/series.js"
 
 registry = (await fetch("data/series.json")).json()
@@ -190,6 +190,9 @@ scaleType = logState.allowed ? scaleChoice : "linear"
   if (selected.length === 0) {
     return html`<p class="placeholder">Select at least one series</p>`;
   }
+  if (range.from > range.to) {
+    return html`<p class="placeholder">The window ends before it starts on ${range.from}. Choose a later To date.</p>`;
+  }
   if (mode === "actual") return actualChart();
   if (win.start > range.to) {
     return html`<p class="placeholder">${
@@ -244,8 +247,7 @@ function actualChart() {
   </div>`;
   const chart = drawPanel([{ series, points }], {
     label: series.unit,
-    // Rates on a linear scale start the y-axis at zero.
-    reference: series.kind === "rate" && scaleType === "linear" ? 0 : null,
+    ...actualAxis(series.kind, scaleType),
     type: scaleType,
     labelKind: "actual",
     tipName: null,
@@ -260,7 +262,7 @@ function actualChart() {
 //| echo: false
 // One chart panel. Panels share the width and left/right margins so dates
 // line up; only the bottom one shows x ticks. `reference` null = no line.
-function drawPanel(list, { label, reference, type, labelKind, tipName, tipFormat, xDomain, height, showXAxis }) {
+function drawPanel(list, { label, reference, zeroFloor = false, type, labelKind, tipName, tipFormat, xDomain, height, showXAxis }) {
   const marginTop = 12;
   const marginBottom = showXAxis ? 30 : 8;
   const marginLeft = 56;
@@ -271,7 +273,7 @@ function drawPanel(list, { label, reference, type, labelKind, tipName, tipFormat
       value: p.value, plotted: p.plotted
     }))
   );
-  const domain = yDomain(rows.map((r) => r.plotted), reference, { type });
+  const domain = yDomain(rows.map((r) => r.plotted), reference, { type, zeroFloor });
   const ends = list.map(({ series, points }) => {
     const last = points[points.length - 1];
     return {

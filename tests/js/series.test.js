@@ -4,7 +4,7 @@ import {
   plottedValue, toRows, shiftYears, presetRange, effectiveStart,
   anchorAndIndex, colorFor, formatEndLabel, yDomain, declutter, declutterValues,
   canSelect, formatChange, panelHeights, PANELS, shownKinds, chartSubtitle,
-  displayMode, logScale, actualPoints, formatActual, actualSubtitle,
+  displayMode, logScale, actualPoints, formatActual, actualSubtitle, actualAxis,
 } from "../../js/series.js";
 
 test("level is indexed to 100 at the anchor", () => {
@@ -232,9 +232,15 @@ test("yDomain on log pads 5% of the log10 span and stays above zero", () => {
   assert.ok(lo > 0);
 });
 
-test("yDomain with a reference of 0 starts a positive rate axis below zero", () => {
-  const [lo] = yDomain([3.5, 5.0], 0);
-  assert.ok(lo < 0);
+test("an all-positive rate on linear in actual mode starts the y-axis at zero", () => {
+  const axis = actualAxis("rate", "linear");
+  assert.deepEqual(axis, { reference: 0, zeroFloor: true });
+  const [lo, hi] = yDomain([3.5, 5.0], axis.reference, { zeroFloor: axis.zeroFloor });
+  assert.equal(lo, 0);
+  assert.equal(hi, 5.25);
+  assert.ok(yDomain([-0.4, 5.0], axis.reference, { zeroFloor: true })[0] < -0.4); // negatives keep padding
+  assert.deepEqual(actualAxis("level", "linear"), { reference: null, zeroFloor: false });
+  assert.deepEqual(actualAxis("rate", "log"), { reference: null, zeroFloor: false });
   const [lo2, hi2] = yDomain([20, 30], null);
   assert.deepEqual([lo2, hi2], [19.5, 30.5]);
 });

@@ -161,8 +161,9 @@ export function panelHeights(kinds, total = PLOT_HEIGHT) {
 }
 
 // Y domain covering the values and the reference line (null for none),
-// padded 5% each side; on "log" the padding is in log10 space.
-export function yDomain(values, reference, { type = "linear" } = {}) {
+// padded 5% each side; on "log" the padding is in log10 space. With
+// `zeroFloor`, an all-non-negative domain starts exactly at 0.
+export function yDomain(values, reference, { type = "linear", zeroFloor = false } = {}) {
   const log = type === "log";
   const f = log ? Math.log10 : (v) => v;
   const g = log ? (v) => 10 ** v : (v) => v;
@@ -174,6 +175,7 @@ export function yDomain(values, reference, { type = "linear" } = {}) {
     if (t > hi) hi = t;
   }
   const pad = hi > lo ? (hi - lo) * 0.05 : log ? 0.05 : 1;
+  if (zeroFloor && !log && lo >= 0) return [0, hi + pad];
   return [g(lo - pad), g(hi + pad)];
 }
 
@@ -254,4 +256,11 @@ export function formatActual(value) {
 
 export function actualSubtitle(unit, type) {
   return `${unit}, ${type} scale`;
+}
+
+// Actual-values y-axis: rates on linear start at zero (reference line at 0);
+// levels, and anything on log, have no reference line.
+export function actualAxis(kind, type) {
+  const rateLinear = kind === "rate" && type === "linear";
+  return { reference: rateLinear ? 0 : null, zeroFloor: rateLinear };
 }

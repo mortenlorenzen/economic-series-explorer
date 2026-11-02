@@ -15,10 +15,11 @@
   - Actual: disabled when any value in the window is ≤ 0, with "Log scale needs every value in the window above zero". This applies to rates too, e.g. the 10-year yield in 2020 stays above zero, while inflation has negative years.
 - **Log in indexed mode** applies to the levels panel only; the rates panel stays linear. The reference line at 100 stays.
 - **Actual-values window**: the stored values with From ≤ date ≤ To. There is no effective-start clamping and no anchor. The x-domain is [From, To].
-  - No values in the window → placeholder "No <name> data between <From> and <To>." This wording is decided here; phase 10 may refine it.
+  - From after To → phase 5's placeholder "The window ends before it starts on <From>. Choose a later To date.", checked before the mode, so it applies to both modes.
+  - Otherwise no values in the window (e.g. To before the series begins) → "No <name> data between <From> and <To>." This wording is decided here; phase 10 may refine it.
 - **Actual y-axis**:
   - The label is the series' `unit`.
-  - Linear: levels use the padded extent of the values with no reference line; rates include 0 in the domain ("start the y-axis at zero") and draw a reference line at 0.
+  - Linear: levels use the padded extent of the values with no reference line. Rates start the y-axis at exactly 0 when every value is ≥ 0 (no padding below), keep padding below when there are negatives, and draw a reference line at 0 (`actualAxis()`).
   - Log: the domain is padded 5% in log space.
 - **Domains and labels on log**: `yDomain` and `declutterValues` take `type: "log"` and work in log10 space, so decluttered end labels still match Plot's scale with `nice: false`.
 - **Actual title** = the series name. **Subtitle** = "<unit>, <linear|log> scale", e.g. "Index points, log scale".
@@ -73,7 +74,7 @@
 ### Requirement: Rate on linear in actual mode
 #### Scenario: y starts at zero
 - WHEN an all-positive rate series is shown in actual mode on Linear
-- THEN the y-domain includes 0
+- THEN the y-domain starts at exactly 0, with a reference line there
 
 ### Requirement: Page
 #### Scenario: actual S&P 500 on log
