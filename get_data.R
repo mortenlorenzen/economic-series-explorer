@@ -62,16 +62,54 @@ validate_registry <- function(reg) {
   invisible(reg)
 }
 
-# Full available history as a data frame of date and value.
-fetch_series <- function(row) {
-  if (row$source != "yahoo") {
-    stop(row$id, ": unsupported source '", row$source, "'", call. = FALSE)
+# Calls f() up to `tries` times, waiting `wait`, then 2 × `wait`, … between
+# attempts; the last error is rethrown with the series id.
+with_retry <- function(f, id, tries = 3, wait = 2) {
+  for (attempt in seq_len(tries)) {
+    result <- tryCatch(f(), error = function(e) e)
+    if (!inherits(result, "error")) return(result)
+    if (attempt < tries) Sys.sleep(wait * 2^(attempt - 1))
   }
+  stop(id, ": fetch failed after ", tries, " tries: ", conditionMessage(result),
+       call. = FALSE)
+}
+
+fetch_yahoo <- function(symbol) {
   x <- quantmod::getSymbols(
-    row$symbol, src = "yahoo", from = "1900-01-01", auto.assign = FALSE
+    symbol, src = "yahoo", from = "1900-01-01", auto.assign = FALSE
   )
   adj <- quantmod::Ad(x)
   data.frame(date = zoo::index(adj), value = as.numeric(adj))
+}
+
+fetch_fred <- function(symbol) {
+  resp <- httr2::request("https://fred.stlouisfed.org/graph/fredgraph.csv") |>
+    httr2::req_url_query(id = symbol) |>
+    httr2::req_perform()
+  parse_fred_csv(httr2::resp_body_string(resp), symbol)
+}
+
+# FRED's public CSV: observation_date,<symbol>; blank cells are missing.
+parse_fred_csv <- function(text, symbol) {
+  df <- readr::read_csv(
+    I(text), col_types = readr::cols(.default = "c"), na = "", progress = FALSE
+  )
+  if (!identical(names(df), c("observation_date", symbol))) {
+    stop("FRED CSV for ", symbol, " has columns ",
+         paste(names(df), collapse = ", "), call. = FALSE)
+  }
+  data.frame(date = as.Date(df[[1]]), value = as.numeric(df[[2]]))
+}
+
+fetchers <- list(yahoo = fetch_yahoo, fred = fetch_fred)
+
+# Full available history as a data frame of date and value.
+fetch_series <- function(row, wait = 2) {
+  fetch <- fetchers[[row$source]]
+  if (is.null(fetch)) {
+    stop(row$id, ": unsupported source '", row$source, "'", call. = FALSE)
+  }
+  with_retry(function() fetch(row$symbol), row$id, wait = wait)
 }
 
 # Drops NA values and duplicate dates (keeping the first), sorts by date.

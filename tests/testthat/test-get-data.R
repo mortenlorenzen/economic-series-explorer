@@ -49,8 +49,8 @@ test_that("clean_series stops when nothing is left", {
 
 test_that("unsupported source and transform stop with the series id", {
   row <- read_registry(fixture("registry.csv"))[1, ]
-  row$source <- "fred"
-  expect_error(fetch_series(row), "sp500: unsupported source 'fred'")
+  row$source <- "bloomberg"
+  expect_error(fetch_series(row), "sp500: unsupported source 'bloomberg'")
   row <- read_registry(fixture("registry.csv"))[1, ]
   row$transform <- "yoy"
   expect_error(apply_transform(data.frame(), row), "sp500: unknown transform 'yoy'")
@@ -94,4 +94,39 @@ test_that("a single observation is still written as arrays", {
   json <- readLines(file.path(dir, "sp500.json"))
   expect_match(json, '"dates":["2020-01-02"]', fixed = TRUE)
   expect_match(json, '"values":[1.5]', fixed = TRUE)
+})
+
+test_that("parse_fred_csv reads dates and values, blank as NA", {
+  text <- paste(readLines(fixture("fred_dgs10.csv")), collapse = "\n")
+  df <- parse_fred_csv(text, "DGS10")
+  expect_s3_class(df$date, "Date")
+  expect_equal(format(df$date), c("1962-01-04", "1962-01-02", "1962-02-12", "1962-01-03"))
+  expect_equal(df$value, c(3.99, 4.06, NA, 4.03))
+  expect_equal(nrow(clean_series(df, "treasury10yr")), 3)
+})
+
+test_that("parse_fred_csv stops on a header for another symbol", {
+  expect_error(parse_fred_csv("observation_date,UNRATE\n1948-01-01,3.4", "DGS10"),
+               "FRED CSV for DGS10 has columns observation_date, UNRATE")
+})
+
+test_that("with_retry succeeds after transient failures", {
+  calls <- 0
+  f <- function() {
+    calls <<- calls + 1
+    if (calls < 3) stop("timeout")
+    "ok"
+  }
+  expect_equal(with_retry(f, "x", wait = 0), "ok")
+  expect_equal(calls, 3)
+})
+
+test_that("with_retry gives up after three tries with the id and last error", {
+  calls <- 0
+  f <- function() {
+    calls <<- calls + 1
+    stop("HTTP 503")
+  }
+  expect_error(with_retry(f, "gdp", wait = 0), "gdp: fetch failed after 3 tries: HTTP 503")
+  expect_equal(calls, 3)
 })
