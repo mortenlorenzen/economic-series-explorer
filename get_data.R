@@ -9,11 +9,12 @@ registry_columns <- c(
 
 sources <- c("yahoo", "fred")
 kinds <- c("level", "rate")
+text_columns <- c("name", "category", "symbol", "unit", "description")
 
 # Transform functions by name, each (df) -> df. Adding one is one entry.
 transforms <- list(
-  none = function(df) df,
-  yoy = function(df) yoy(df)
+  none = \(df) df,
+  yoy = \(df) yoy(df)
 )
 
 read_registry <- function(path = "series.csv") {
@@ -30,33 +31,33 @@ read_registry <- function(path = "series.csv") {
       call. = FALSE
     )
   }
-  reg <- as.data.frame(reg)
   validate_registry(reg)
-  reg$max_stale_days <- as.numeric(reg$max_stale_days)
-  reg
+  reg |>
+    dplyr::mutate(max_stale_days = as.numeric(max_stale_days))
 }
 
 # Stops with every problem in the registry at once, one line per problem.
 validate_registry <- function(reg) {
-  problems <- character()
-  add <- function(i, msg) {
-    problems[length(problems) + 1] <<- paste0("row ", i, " (", reg$id[i], "): ", msg)
-  }
   dup <- duplicated(reg$id)
   stale <- suppressWarnings(as.numeric(reg$max_stale_days))
-  for (i in seq_len(nrow(reg))) {
-    if (!grepl("^[a-z0-9_]+$", reg$id[i])) add(i, "id must be lowercase letters, digits or _")
-    if (dup[i]) add(i, "duplicate id")
-    if (!reg$source[i] %in% sources) add(i, paste0("unknown source '", reg$source[i], "'"))
-    if (!reg$kind[i] %in% kinds) add(i, paste0("unknown kind '", reg$kind[i], "'"))
-    if (!reg$transform[i] %in% names(transforms)) {
-      add(i, paste0("unknown transform '", reg$transform[i], "'"))
-    }
-    if (is.na(stale[i]) || stale[i] <= 0) add(i, "max_stale_days must be a number above 0")
-    for (col in c("name", "category", "symbol", "unit", "description")) {
-      if (trimws(reg[[col]][i]) == "") add(i, paste0(col, " is empty"))
-    }
-  }
+  problems <- seq_len(nrow(reg)) |>
+    purrr::map(\(i) {
+      empty <- text_columns |>
+        purrr::keep(\(col) trimws(reg[[col]][i]) == "")
+      msgs <- c(
+        if (!grepl("^[a-z0-9_]+$", reg$id[i])) "id must be lowercase letters, digits or _",
+        if (dup[i]) "duplicate id",
+        if (!reg$source[i] %in% sources) paste0("unknown source '", reg$source[i], "'"),
+        if (!reg$kind[i] %in% kinds) paste0("unknown kind '", reg$kind[i], "'"),
+        if (!reg$transform[i] %in% names(transforms)) {
+          paste0("unknown transform '", reg$transform[i], "'")
+        },
+        if (is.na(stale[i]) || stale[i] <= 0) "max_stale_days must be a number above 0",
+        paste0(empty, " is empty", recycle0 = TRUE)
+      )
+      sprintf("row %d (%s): %s", i, reg$id[i], msgs)
+    }) |>
+    purrr::list_c(ptype = character())
   if (length(problems)) {
     stop("invalid series.csv:\n", paste(problems, collapse = "\n"), call. = FALSE)
   }
@@ -67,7 +68,7 @@ validate_registry <- function(reg) {
 # attempts; the last error is rethrown with the series id.
 with_retry <- function(f, id, tries = 3, wait = 2) {
   for (attempt in seq_len(tries)) {
-    result <- tryCatch(f(), error = function(e) e)
+    result <- tryCatch(f(), error = \(e) e)
     if (!inherits(result, "error")) return(result)
     if (attempt < tries) Sys.sleep(wait * 2^(attempt - 1))
   }
@@ -76,18 +77,19 @@ with_retry <- function(f, id, tries = 3, wait = 2) {
 }
 
 fetch_yahoo <- function(symbol) {
-  x <- quantmod::getSymbols(
+  adj <- quantmod::getSymbols(
     symbol, src = "yahoo", from = "1900-01-01", auto.assign = FALSE
-  )
-  adj <- quantmod::Ad(x)
-  data.frame(date = zoo::index(adj), value = as.numeric(adj))
+  ) |>
+    quantmod::Ad()
+  tibble::tibble(date = zoo::index(adj), value = as.numeric(adj))
 }
 
 fetch_fred <- function(symbol) {
-  resp <- httr2::request("https://fred.stlouisfed.org/graph/fredgraph.csv") |>
+  httr2::request("https://fred.stlouisfed.org/graph/fredgraph.csv") |>
     httr2::req_url_query(id = symbol) |>
-    httr2::req_perform()
-  parse_fred_csv(httr2::resp_body_string(resp), symbol)
+    httr2::req_perform() |>
+    httr2::resp_body_string() |>
+    parse_fred_csv(symbol)
 }
 
 # FRED's public CSV: observation_date,<symbol>; blank cells are missing.
@@ -99,7 +101,11 @@ parse_fred_csv <- function(text, symbol) {
     stop("FRED CSV for ", symbol, " has columns ",
          paste(names(df), collapse = ", "), call. = FALSE)
   }
-  data.frame(date = as.Date(df[[1]]), value = as.numeric(df[[2]]))
+  df |>
+    dplyr::transmute(
+      date = as.Date(observation_date),
+      value = as.numeric(.data[[symbol]])
+    )
 }
 
 fetchers <- list(yahoo = fetch_yahoo, fred = fetch_fred)
@@ -110,16 +116,16 @@ fetch_series <- function(row, wait = 2) {
   if (is.null(fetch)) {
     stop(row$id, ": unsupported source '", row$source, "'", call. = FALSE)
   }
-  with_retry(function() fetch(row$symbol), row$id, wait = wait)
+  with_retry(\() fetch(row$symbol), row$id, wait = wait)
 }
 
 # Drops NA values and duplicate dates (keeping the first), sorts by date.
 clean_series <- function(df, id) {
-  df <- df[!is.na(df$value), ]
-  df <- df[!duplicated(df$date), ]
-  df <- df[order(df$date), ]
+  df <- df |>
+    dplyr::filter(!is.na(value)) |>
+    dplyr::distinct(date, .keep_all = TRUE) |>
+    dplyr::arrange(date)
   if (nrow(df) == 0) stop(id, ": no observations after cleaning", call. = FALSE)
-  rownames(df) <- NULL
   df
 }
 
@@ -134,14 +140,15 @@ apply_transform <- function(df, row) {
 # Year-over-year change in percent against the same calendar date one year
 # earlier; dates without that earlier observation are dropped.
 yoy <- function(df) {
-  earlier <- as.Date(paste0(
-    as.integer(format(df$date, "%Y")) - 1, format(df$date, "-%m-%d")
-  ), format = "%Y-%m-%d", optional = TRUE)
-  prev <- df$value[match(earlier, df$date)]
-  keep <- !is.na(prev)
-  out <- data.frame(date = df$date[keep], value = 100 * (df$value[keep] / prev[keep] - 1))
-  rownames(out) <- NULL
-  out
+  df |>
+    dplyr::mutate(
+      earlier = as.Date(paste0(
+        as.integer(format(date, "%Y")) - 1, format(date, "-%m-%d")
+      ), format = "%Y-%m-%d", optional = TRUE),
+      prev = value[match(earlier, date)]
+    ) |>
+    dplyr::filter(!is.na(prev)) |>
+    dplyr::transmute(date, value = 100 * (value / prev - 1))
 }
 
 series_json <- function(row, df) {
@@ -150,28 +157,29 @@ series_json <- function(row, df) {
     id = row$id, name = row$name, category = row$category,
     source = row$source, symbol = row$symbol, kind = row$kind,
     unit = row$unit, description = row$description,
-    first_date = dates[1], last_date = dates[length(dates)], n = nrow(df),
+    first_date = dplyr::first(dates), last_date = dplyr::last(dates), n = nrow(df),
     dates = I(dates), values = I(df$value)
   )
 }
 
 write_json_file <- function(x, path) {
-  json <- jsonlite::toJSON(x, auto_unbox = TRUE, digits = I(7))
-  writeLines(json, path, useBytes = TRUE)
+  jsonlite::toJSON(x, auto_unbox = TRUE, digits = I(7)) |>
+    writeLines(path, useBytes = TRUE)
 }
 
 # Writes one file per series plus the metadata index, in registry order.
 write_data <- function(series, dir = "data") {
   dir.create(dir, showWarnings = FALSE)
-  for (s in series) write_json_file(s, file.path(dir, paste0(s$id, ".json")))
-  meta <- lapply(series, function(s) s[setdiff(names(s), c("dates", "values"))])
-  write_json_file(meta, file.path(dir, "series.json"))
+  purrr::walk(series, \(s) write_json_file(s, file.path(dir, paste0(s$id, ".json"))))
+  series |>
+    purrr::map(\(s) s[setdiff(names(s), c("dates", "values"))]) |>
+    write_json_file(file.path(dir, "series.json"))
 }
 
 # Warns when the last observation is older than max_stale_days, fails when
 # it is older than twice that.
 check_staleness <- function(row, df, today) {
-  age <- as.numeric(today - df$date[nrow(df)])
+  age <- as.numeric(today - dplyr::last(df$date))
   if (age > 2 * row$max_stale_days) {
     stop(row$id, ": last observation is ", age, " days old (fails above ",
          2 * row$max_stale_days, ")", call. = FALSE)
@@ -195,13 +203,14 @@ check_regression <- function(id, n, dir = "data") {
 }
 
 build_series <- function(row, fetch, dir, today) {
-  df <- clean_series(fetch(row), row$id)
-  df <- apply_transform(df, row)
+  df <- fetch(row) |>
+    clean_series(row$id) |>
+    apply_transform(row)
   if (nrow(df) == 0) stop(row$id, ": no observations after transform", call. = FALSE)
   check_staleness(row, df, today)
   check_regression(row$id, nrow(df), dir)
-  message(row$id, ": ", nrow(df), " observations, ", df$date[1], " to ",
-          df$date[nrow(df)])
+  message(row$id, ": ", nrow(df), " observations, ", dplyr::first(df$date), " to ",
+          dplyr::last(df$date))
   series_json(row, df)
 }
 
@@ -209,17 +218,18 @@ build_series <- function(row, fetch, dir, today) {
 # series; writes only when all succeed.
 run_pipeline <- function(reg, fetch = fetch_series, dir = "data",
                          today = as.Date(format(Sys.time(), tz = "UTC"))) {
-  results <- lapply(seq_len(nrow(reg)), function(i) {
-    id <- reg$id[i]
-    tryCatch(build_series(reg[i, ], fetch, dir, today), error = function(e) {
-      msg <- conditionMessage(e)
-      if (!startsWith(msg, paste0(id, ": "))) msg <- paste0(id, ": ", msg)
-      simpleError(msg)
+  results <- seq_len(nrow(reg)) |>
+    purrr::map(\(i) {
+      id <- reg$id[i]
+      tryCatch(build_series(reg[i, ], fetch, dir, today), error = \(e) {
+        msg <- conditionMessage(e)
+        if (!startsWith(msg, paste0(id, ": "))) msg <- paste0(id, ": ", msg)
+        simpleError(msg)
+      })
     })
-  })
-  failed <- vapply(results, inherits, logical(1), "error")
+  failed <- purrr::map_lgl(results, \(r) inherits(r, "error"))
   if (any(failed)) {
-    msgs <- vapply(results[failed], conditionMessage, character(1))
+    msgs <- purrr::map_chr(results[failed], conditionMessage)
     stop(sum(failed), " of ", nrow(reg), " series failed, nothing written:\n",
          paste(msgs, collapse = "\n"), call. = FALSE)
   }
@@ -227,7 +237,8 @@ run_pipeline <- function(reg, fetch = fetch_series, dir = "data",
 }
 
 main <- function() {
-  run_pipeline(read_registry())
+  read_registry() |>
+    run_pipeline()
 }
 
 if (sys.nframe() == 0) main()
