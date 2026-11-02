@@ -12,7 +12,8 @@ kinds <- c("level", "rate")
 
 # Transform functions by name, each (df) -> df. Adding one is one entry.
 transforms <- list(
-  none = function(df) df
+  none = function(df) df,
+  yoy = function(df) yoy(df)
 )
 
 read_registry <- function(path = "series.csv") {
@@ -123,10 +124,24 @@ clean_series <- function(df, id) {
 }
 
 apply_transform <- function(df, row) {
-  if (row$transform != "none") {
+  transform <- transforms[[row$transform]]
+  if (is.null(transform)) {
     stop(row$id, ": unknown transform '", row$transform, "'", call. = FALSE)
   }
-  df
+  transform(df)
+}
+
+# Year-over-year change in percent against the same calendar date one year
+# earlier; dates without that earlier observation are dropped.
+yoy <- function(df) {
+  earlier <- as.Date(paste0(
+    as.integer(format(df$date, "%Y")) - 1, format(df$date, "-%m-%d")
+  ), optional = TRUE)
+  prev <- df$value[match(earlier, df$date)]
+  keep <- !is.na(prev)
+  out <- data.frame(date = df$date[keep], value = 100 * (df$value[keep] / prev[keep] - 1))
+  rownames(out) <- NULL
+  out
 }
 
 series_json <- function(row, df) {

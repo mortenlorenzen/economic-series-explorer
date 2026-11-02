@@ -52,8 +52,8 @@ test_that("unsupported source and transform stop with the series id", {
   row$source <- "bloomberg"
   expect_error(fetch_series(row), "sp500: unsupported source 'bloomberg'")
   row <- read_registry(fixture("registry.csv"))[1, ]
-  row$transform <- "yoy"
-  expect_error(apply_transform(data.frame(), row), "sp500: unknown transform 'yoy'")
+  row$transform <- "cube"
+  expect_error(apply_transform(data.frame(), row), "sp500: unknown transform 'cube'")
 })
 
 test_that("write_data writes the per-series file and the index", {
@@ -129,4 +129,42 @@ test_that("with_retry gives up after three tries with the id and last error", {
   }
   expect_error(with_retry(f, "gdp", wait = 0), "gdp: fetch failed after 3 tries: HTTP 503")
   expect_equal(calls, 3)
+})
+
+cpi_fixture <- function() {
+  text <- paste(readLines(fixture("fred_cpiaucsl.csv")), collapse = "\n")
+  clean_series(parse_fred_csv(text, "CPIAUCSL"), "inflation")
+}
+
+test_that("transform none passes the data through", {
+  df <- cpi_fixture()
+  row <- list(id = "x", transform = "none")
+  expect_identical(apply_transform(df, row), df)
+})
+
+test_that("yoy on monthly data starts a year later, in percent", {
+  df <- cpi_fixture()
+  expect_equal(nrow(df), 25)
+  out <- apply_transform(df, list(id = "inflation", transform = "yoy"))
+  expect_equal(nrow(out), 13)
+  expect_equal(out$date[1], as.Date("2024-01-01"))
+  expect_equal(out$date[13], as.Date("2025-01-01"))
+  expect_equal(out$value[1], 100 * (df$value[13] / df$value[1] - 1))
+  expect_equal(out$value[13], 100 * (df$value[25] / df$value[13] - 1))
+})
+
+test_that("yoy drops dates without an observation one year earlier", {
+  df <- data.frame(
+    date = as.Date(c("2020-01-01", "2020-03-01", "2021-01-01", "2021-02-01", "2021-03-01")),
+    value = c(100, 200, 110, 120, 210)
+  )
+  out <- yoy(df)
+  expect_equal(format(out$date), c("2021-01-01", "2021-03-01"))
+  expect_equal(out$value, c(10, 5))
+})
+
+test_that("yoy drops 29 February, which has no date a year earlier", {
+  df <- data.frame(date = as.Date(c("2023-02-28", "2024-02-28", "2024-02-29")),
+                   value = c(100, 102, 103))
+  expect_equal(format(yoy(df)$date), "2024-02-28")
 })

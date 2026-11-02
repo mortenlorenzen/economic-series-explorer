@@ -15,7 +15,7 @@
 - **Retries**: `with_retry(f, tries = 3, wait = 2)` retries any error with waits of 2 s and 4 s, then rethrows with the series id. Used for both Yahoo and FRED; the httr2 request gets no extra retry of its own, so the retry rule is the same for both sources. Tests pass `wait = 0`.
 - **Transforms**: a named list `transforms` of functions `(df) -> df`; adding one later (`log`, `diff`) is one entry.
   - `none`: passes through.
-  - `yoy`: for each date, the value at the same calendar date one year earlier must exist; result is `100 * (value / earlier − 1)`, in percent. Dates without an exact one-year-earlier match are dropped, so a monthly series loses its first 12 observations. Clean runs before transform, so duplicates are already gone.
+  - `yoy`: for each date, the value at the same calendar date one year earlier must exist; result is `100 * (value / earlier − 1)`, in percent. Dates without an exact one-year-earlier match are dropped, so a monthly series loses its first 12 observations; 29 February has no such date and is always dropped. Clean runs before transform, so duplicates are already gone.
   - Transformed values are rounded only when written (7 significant digits, phase 2).
 - **Staleness** (`check_staleness(row, df, today)`): age = `today − last date` in days, `today` = the run's UTC date. Age > `max_stale_days` → warning naming the series and age; age > 2 × `max_stale_days` → error. Dates are FRED's period start dates (e.g. 2026-07-01 for Q3), and the §6.1 thresholds are set for that.
 - **Regression** (`check_regression(id, n, dir = "data")`): if `data/<id>.json` exists and its `n` is greater than the new `n` → error naming both counts. No existing file → fine (a new series).
