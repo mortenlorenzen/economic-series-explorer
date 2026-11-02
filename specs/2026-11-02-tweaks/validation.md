@@ -7,7 +7,7 @@
 
 ## Manual
 - [ ] 1400 px screen: controls in one bar above the chart, no sidebar, chart wider than 1,100 px
-- [ ] Series dropdown: opens, ticks update the chart and the count, closes on an outside click and on Escape
+- [ ] Series checkboxes: always visible in the top row; ticking updates the chart
 - [ ] Slider: dragging updates the dates live and redraws on release; handles can't cross; the arrow keys move one day; presets set it
 - [ ] Actual mode on Inflation Rate: the end label has 2 decimals
 - [ ] PNG with 3 series: three description lines, source line, footer line with today's date, the URL and © 2026 Morten Lorenzen

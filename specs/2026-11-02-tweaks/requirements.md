@@ -9,7 +9,7 @@
 - **Top bar** (owner's choice: all controls; replaces the sidebar from Phases 5–9):
   - Every control sits in one bar above the chart, in this order: Series, Date range, Display, Y-axis scale, Export. The bar wraps on narrow screens.
   - The chart uses the full page width.
-  - **Series** is a dropdown button, "Series (n) ▾", that opens a panel with the grouped checkboxes and Deselect All. The panel closes on a click outside it or on Escape. The max-8 rule and the registry order are unchanged.
+  - **Series** (owner's follow-up: checkboxes, not a dropdown): the grouped checkboxes and Deselect All are always visible, as one wrapping row of category groups at the top of the bar; the other controls follow below. The max-8 rule and the registry order are unchanged.
   - **Display** and **Y-axis scale** are inline radio groups, with the same rules and tooltips as before.
 - **Date slider** (owner's choice: slider only; replaces the From/To date inputs):
   - One track with two handles, From and To, spanning the earliest `first_date` to the latest `last_date` in the registry, in steps of one day.
@@ -55,9 +55,9 @@
 - WHEN the page opens on a 1400 px screen
 - THEN no sidebar is shown and the chart is wider than before (more than 1,100 px)
 
-#### Scenario: dropdown
-- WHEN Series is clicked and a box is ticked
-- THEN the chart updates, the button reads "Series (3) ▾", and a click outside closes the panel
+#### Scenario: checkboxes
+- WHEN a series box in the top row is ticked
+- THEN the chart updates without opening anything first
 
 ### Requirement: PNG
 #### Scenario: descriptions and footer
