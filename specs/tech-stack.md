@@ -53,4 +53,4 @@
 - 2026-11-02 — brief's phase 1 split into scaffold/harness and first series; brief's phase 9 split into edge cases and description/about/metadata: each phase reviewable in one sitting.
 - 2026-11-02 — CLAUDE.md Test command is `./run-tests.sh` from the start; phase 1 creates it first.
 - 2026-11-02 — no lint/typecheck command; tests are the check.
-- 2026-11-02 — daily data commits go straight to `main` because the GitHub Actions app is on the `protect-main` ruleset's bypass list; chosen over a daily auto-merged PR (more moving parts) and a separate `data` branch (main would no longer hold current data).
+- 2026-11-02 — daily data reaches `main` through a PR that `update-data.yml` opens and squash-merges itself, because `protect-main` requires PRs and a personal repo can't add the GitHub Actions app as a bypass actor; chosen over a separate `data` branch (main would no longer hold current data). Replaces the same day's direct-push decision.
