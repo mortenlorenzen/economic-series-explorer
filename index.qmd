@@ -2,10 +2,20 @@
 title: "Economic Series Explorer"
 ---
 
-The explorer is being built. Charts arrive in the next phases.
-
 ```{ojs}
 //| echo: false
-import { plottedValue } from "./js/series.js"
-md`Module check: \`plottedValue("level", 150, 100)\` = ${plottedValue("level", 150, 100)}`
+import { toRows } from "./js/series.js"
+
+registry = (await fetch("data/series.json")).json()
+meta = registry[0]
+series = (await fetch(`data/${meta.id}.json`)).json()
+rows = toRows(series)
+
+Plot.plot({
+  title: series.name,
+  width,
+  y: { label: series.unit, grid: true },
+  x: { label: null },
+  marks: [Plot.lineY(rows, { x: "date", y: "value" })]
+})
 ```
