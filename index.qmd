@@ -11,11 +11,13 @@ import {
   toRows, presetRange, PRESETS, effectiveStart, anchorAndIndex, colorFor,
   formatEndLabel, formatChange, yDomain, declutterValues, canSelect,
   PANELS, panelHeights, shownKinds, chartSubtitle,
-  displayMode, DISPLAY_REASON, logScale, actualPoints, actualSubtitle, actualAxis
+  displayMode, DISPLAY_REASON, logScale, actualPoints, actualSubtitle, actualAxis,
+  createLoader
 } from "./js/series.js"
 
 registry = (await fetch("data/series.json")).json()
 registryIndex = new Map(registry.map((s, i) => [s.id, i]))
+loadSeries = createLoader(async (id) => (await fetch(`data/${id}.json`)).json())
 pickable = registry
 DEFAULT_SELECTION = ["sp500", "nasdaq"]
 DEFAULT_PRESET = "10Y"
@@ -169,7 +171,7 @@ viewof scaleChoice.setState(!logState.allowed, logState.reason, "linear")
 //| echo: false
 utc = (date) => new Date(`${date}T00:00:00Z`)
 selectedMeta = registry.filter((s) => selected.includes(s.id))
-loaded = Promise.all(selectedMeta.map(async (m) => (await fetch(`data/${m.id}.json`)).json()))
+loaded = Promise.all(selectedMeta.map((m) => loadSeries(m.id)))
 mode = displayMode(displayChoice, selected.length)
 win = effectiveStart(range.from, selectedMeta)
 indexed = loaded.map((series) => ({ series, result: anchorAndIndex(series, win.start, range.to) }))

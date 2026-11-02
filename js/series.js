@@ -264,3 +264,19 @@ export function actualAxis(kind, type) {
   const rateLinear = kind === "rate" && type === "linear";
   return { reference: rateLinear ? 0 : null, zeroFloor: rateLinear };
 }
+
+// One fetch per series id: load(id) returns the cached promise. A failed
+// fetch is dropped from the cache so the next load tries again.
+export function createLoader(fetchJson) {
+  const cache = new Map();
+  return function load(id) {
+    if (!cache.has(id)) {
+      const promise = fetchJson(id).catch((error) => {
+        cache.delete(id);
+        throw error;
+      });
+      cache.set(id, promise);
+    }
+    return cache.get(id);
+  };
+}

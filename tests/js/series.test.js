@@ -5,6 +5,7 @@ import {
   anchorAndIndex, colorFor, formatEndLabel, yDomain, declutter, declutterValues,
   canSelect, formatChange, panelHeights, PANELS, shownKinds, chartSubtitle,
   displayMode, logScale, actualPoints, formatActual, actualSubtitle, actualAxis,
+  createLoader,
 } from "../../js/series.js";
 
 test("level is indexed to 100 at the anchor", () => {
@@ -258,4 +259,30 @@ test("formatActual and actualSubtitle", () => {
   assert.equal(formatActual(7580.07), "7580.07");
   assert.equal(formatEndLabel("S&P 500", 7580.07, "actual"), "S&P 500 (7580.07)");
   assert.equal(actualSubtitle("Index points", "log"), "Index points, log scale");
+});
+
+test("createLoader fetches each id once", async () => {
+  const calls = [];
+  const load = createLoader(async (id) => {
+    calls.push(id);
+    return { id };
+  });
+  const [a, b] = await Promise.all([load("sp500"), load("nasdaq")]);
+  assert.deepEqual([a.id, b.id], ["sp500", "nasdaq"]);
+  assert.equal(await load("sp500"), a);
+  assert.deepEqual(calls, ["sp500", "nasdaq"]);
+});
+
+test("createLoader retries an id whose fetch failed", async () => {
+  let fail = true;
+  let calls = 0;
+  const load = createLoader(async (id) => {
+    calls++;
+    if (fail) throw new Error("404");
+    return { id };
+  });
+  await assert.rejects(load("gdp"), /404/);
+  fail = false;
+  assert.deepEqual(await load("gdp"), { id: "gdp" });
+  assert.equal(calls, 2);
 });
