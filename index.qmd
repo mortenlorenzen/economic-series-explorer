@@ -571,12 +571,15 @@ async function inlineFonts(family, weights) {
 <style>
 /* Full width: the explorer spans the whole screen, not Quarto's page column. */
 main.content.column-page, #title-block-header { grid-column: screen-start-inset / screen-end-inset; }
-.controls-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.5rem; margin-bottom: 1rem; }
+/* Controls in a tinted, framed panel; the chart card below stays white. */
+.controls-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.5rem; margin-bottom: 1rem;
+  padding: 0.75rem 1.25rem; background: var(--bs-tertiary-bg, #f8f9fa); border: 1px solid var(--bs-border-color, #dee2e6);
+  border-radius: 0.5rem; }
 .controls-bar > * { margin: 0; }
 .controls-bar .cell, .controls-bar .cell-output-display { display: flex; align-items: center; gap: 0.5rem 1.5rem; flex-wrap: wrap; overflow: visible; }
 .controls-bar .cell-output-display:empty, .controls-bar .cell:has(.cell-output-display:empty) { display: none; }
 .control-label, .controls-bar legend { font-size: 0.85rem; font-weight: 600; margin: 0 0.5rem 0 0; }
-.controls-bar .cell:has(.picker) { flex-basis: 100%; padding-bottom: 0.75rem; border-bottom: 1px solid var(--bs-border-color, #dee2e6); }
+.controls-bar .cell:has(.picker) { flex-basis: 100%; padding-bottom: 0.75rem; border-bottom: 1px solid var(--bs-border-color, #dee2e6); margin-bottom: 0.25rem; }
 /* The chart with its descriptions, title and notes as one card. */
 .chart-card { border: 1px solid var(--bs-border-color, #dee2e6); border-radius: 0.5rem; padding: 1rem 1.25rem; margin-top: 0.5rem; }
 .chart-card > .cell:last-child .chart > :last-child { margin-bottom: 0; }
