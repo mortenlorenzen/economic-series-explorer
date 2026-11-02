@@ -288,6 +288,7 @@ File name: `<ids joined by +>_<mode>_<from>_<to>_<today>.csv`, e.g. `sp500+nasda
 - Daily data reaches `main` through a PR the workflow opens and merges itself — a personal repo can't let GitHub Actions bypass the PR rule.
 - All controls in a top bar, series as always-visible checkboxes, a two-handle date slider instead of From/To inputs — a full-width chart (owner's tweaks).
 - Twenty series instead of eleven; colours re-assigned on a clash so selected lines never share one.
+- R code in tidyverse style (`|>`, `<-`, snake_case); FRED stays on httr2, because quantmod's FRED method fails without an API key and a key secret isn't worth it.
 - BRIEF.md stays as the original; this file describes the app as built.
 
 ## 8. Links
