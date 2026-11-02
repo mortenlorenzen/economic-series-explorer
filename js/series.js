@@ -467,3 +467,33 @@ export function pickFontFaces(faces, family, weights) {
   }
   return picked;
 }
+
+// A series file is usable when its dates and values are arrays of one length.
+export function checkSeries(id, json) {
+  if (!json || !Array.isArray(json.dates) || !Array.isArray(json.values) || json.dates.length !== json.values.length) {
+    throw new Error(`${id}: malformed series file`);
+  }
+  return json;
+}
+
+// Fetches data/<id>.json through `fetchFn`; an HTTP error or a malformed
+// body rejects, like a network error.
+export async function fetchSeries(id, fetchFn) {
+  const res = await fetchFn(`data/${id}.json`);
+  if (!res.ok) throw new Error(`${id}: HTTP ${res.status}`);
+  return checkSeries(id, await res.json());
+}
+
+// Loads every id in parallel and never rejects: the series that loaded, in
+// the order given, and the ids that failed.
+export async function loadAll(ids, load) {
+  const results = await Promise.allSettled(ids.map((id) => load(id)));
+  const series = [];
+  const failed = [];
+  results.forEach((r, i) => (r.status === "fulfilled" ? series.push(r.value) : failed.push(ids[i])));
+  return { series, failed };
+}
+
+export function failureMessage(names) {
+  return `Could not load ${names.join(", ")}. Untick and tick again to retry.`;
+}

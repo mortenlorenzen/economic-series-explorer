@@ -9,6 +9,7 @@ import {
   createLoader, isDaily, isoWeekKey, windowOverTenYears, downsampleWeekly,
   exportRows, toCsv, exportFileName, todayLocal,
   sourceCaption, exportLayout, EXPORT_TEXT, wrapText, parseFontFaces, pickFontFaces,
+  checkSeries, fetchSeries, loadAll, failureMessage,
 } from "../../js/series.js";
 
 test("level is indexed to 100 at the anchor", () => {
@@ -472,4 +473,43 @@ test("pickFontFaces keeps only the latin normal face per weight", () => {
 test("pickFontFaces accepts a variable-font weight range", () => {
   const faces = parseFontFaces("@font-face{font-family:\"V\";font-weight:300 700;src:url(v.woff2)}");
   assert.equal(pickFontFaces(faces, "V", [400]).length, 1);
+});
+
+const okSeries = (id) => ({ id, dates: ["2020-01-01"], values: [1] });
+
+test("loadAll keeps the loaded series in order and names the failed ids", async () => {
+  const load = (id) => (id === "djia" ? Promise.reject(new Error("offline")) : Promise.resolve(okSeries(id)));
+  const { series, failed } = await loadAll(["sp500", "djia", "nasdaq"], load);
+  assert.deepEqual(series.map((s) => s.id), ["sp500", "nasdaq"]);
+  assert.deepEqual(failed, ["djia"]);
+  assert.deepEqual(await loadAll([], load), { series: [], failed: [] });
+});
+
+test("fetchSeries treats an HTTP error as a failure", async () => {
+  const fetch404 = async () => ({ ok: false, status: 404, json: async () => ({}) });
+  await assert.rejects(fetchSeries("djia", fetch404), /djia: HTTP 404/);
+  const fetchOk = async (url) => ({ ok: true, status: 200, json: async () => okSeries(url) });
+  assert.equal((await fetchSeries("sp500", fetchOk)).id, "data/sp500.json");
+});
+
+test("fetchSeries rejects a malformed body", async () => {
+  const bad = async () => ({ ok: true, status: 200, json: async () => ({ dates: ["a", "b", "c"], values: [1, 2] }) });
+  await assert.rejects(fetchSeries("x", bad), /x: malformed series file/);
+  assert.throws(() => checkSeries("y", null), /malformed/);
+  assert.throws(() => checkSeries("y", { dates: [] }), /malformed/);
+});
+
+test("a failed load is retried through the loader", async () => {
+  let calls = 0;
+  const load = createLoader(async (id) => {
+    calls++;
+    if (calls === 1) throw new Error("offline");
+    return okSeries(id);
+  });
+  assert.deepEqual((await loadAll(["djia"], load)).failed, ["djia"]);
+  assert.deepEqual((await loadAll(["djia"], load)).series.map((s) => s.id), ["djia"]);
+});
+
+test("failureMessage names the series", () => {
+  assert.equal(failureMessage(["Dow Jones", "NASDAQ"]), "Could not load Dow Jones, NASDAQ. Untick and tick again to retry.");
 });
