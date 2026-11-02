@@ -12,7 +12,9 @@ import {
   formatEndLabel, formatChange, yDomain, declutterValues, canSelect,
   PANELS, panelHeights, shownKinds, chartSubtitle,
   displayMode, DISPLAY_REASON, logScale, actualPoints, actualSubtitle, actualAxis,
-  createLoader, isDaily, windowOverTenYears, downsampleWeekly
+  createLoader, isDaily, windowOverTenYears, downsampleWeekly,
+  exportRows, toCsv, exportFileName, todayLocal, sourceCaption, exportLayout, EXPORT_TEXT,
+  parseFontFaces, pickFontFaces
 } from "./js/series.js"
 
 registry = (await fetch("data/series.json")).json()
@@ -169,6 +171,33 @@ viewof displayChoice.setState(selected.length !== 1, DISPLAY_REASON, "indexed")
 viewof scaleChoice.setState(!logState.allowed, logState.reason, "linear")
 ```
 
+```{ojs}
+//| echo: false
+// PNG and CSV of what the chart shows; disabled when no chart is drawn.
+{
+  const png = html`<button type="button" class="btn btn-sm btn-outline-secondary">PNG</button>`;
+  const csv = html`<button type="button" class="btn btn-sm btn-outline-secondary">CSV</button>`;
+  png.disabled = csv.disabled = !exported;
+  const name = (ext) => exportFileName(
+    exported.list.map((d) => d.series.id), exported.mode, exported.from, range.to, todayLocal(), ext
+  );
+  csv.onclick = () => {
+    const text = toCsv(exportRows(exported.mode, exported.list));
+    download(new Blob([text], { type: "text/csv" }), name("csv"));
+  };
+  png.onclick = async () => {
+    png.disabled = true;
+    try {
+      const caption = sourceCaption(exported.list.map((d) => d.series.source));
+      download(await chartPng(chart, caption), name("png"));
+    } finally {
+      png.disabled = false;
+    }
+  };
+  return html`<fieldset class="export-group"><legend>Export</legend>${png} ${csv}</fieldset>`;
+}
+```
+
 :::
 
 ::: {.panel-fill}
@@ -190,11 +219,28 @@ logState = mode === "actual"
       levelsShown: kinds.includes("level")
     })
 scaleType = logState.allowed ? scaleChoice : "linear"
+// What the export buttons export: the drawn series at full resolution, or
+// null when the chart shows a placeholder.
+exported = {
+  if (selected.length === 0 || range.from > range.to) return null;
+  if (mode === "actual") {
+    return actual.points.length
+      ? { mode, from: range.from, list: [{ series: actual.series, points: actual.points }] }
+      : null;
+  }
+  if (win.start > range.to || shown.length === 0) return null;
+  return { mode, from: win.start, list: shown.map(({ series, result }) => ({ series, points: result.points })) };
+}
 ```
 
 ```{ojs}
 //| echo: false
-{
+chart = html`<div class="chart">${chartContent()}</div>`
+```
+
+```{ojs}
+//| echo: false
+function chartContent() {
   if (selected.length === 0) {
     return html`<p class="placeholder">Select at least one series</p>`;
   }
@@ -328,6 +374,131 @@ function drawPanel(list, { label, reference, zeroFloor = false, type, labelKind,
 
 :::
 
+```{ojs}
+//| echo: false
+function download(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+```
+
+```{ojs}
+//| echo: false
+// The chart as one SVG — title, subtitle, every panel, note, caption — with
+// its webfont inlined, rasterised at 2×. Resolves to a PNG blob.
+async function chartPng(el, caption) {
+  const NS = "http://www.w3.org/2000/svg";
+  const { pad } = EXPORT_TEXT;
+  const panels = [...el.querySelectorAll("svg")].filter((s) => !s.parentElement.closest("svg"));
+  const heights = panels.map((s) => +s.getAttribute("height"));
+  const width = Math.max(...panels.map((s) => +s.getAttribute("width")));
+  const titleEl = el.querySelector(".chart-title");
+  const subtitleEl = el.querySelector(".chart-subtitle");
+  const noteEl = el.querySelector(".chart-note");
+  const layout = exportLayout(heights, { note: !!noteEl });
+  const W = width + 2 * pad;
+  const H = layout.height;
+
+  const titleStyle = getComputedStyle(titleEl);
+  const family = titleStyle.fontFamily.split(",")[0].trim().replace(/^['"]|['"]$/g, "");
+  const textWeight = Number(getComputedStyle(el).fontWeight);
+  const titleWeight = Number(titleStyle.fontWeight);
+
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("xmlns", NS);
+  svg.setAttribute("width", W);
+  svg.setAttribute("height", H);
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("style", `color: ${getComputedStyle(el).color}`);
+  const style = document.createElementNS(NS, "style");
+  style.textContent = await inlineFonts(family, [textWeight, titleWeight]);
+  svg.append(style);
+  const bg = document.createElementNS(NS, "rect");
+  for (const [k, v] of Object.entries({ width: W, height: H, fill: "white" })) bg.setAttribute(k, v);
+  svg.append(bg);
+  const text = (content, y, spec, { weight = textWeight, fill = "currentColor" } = {}) => {
+    const t = document.createElementNS(NS, "text");
+    for (const [k, v] of Object.entries({
+      x: pad, y, fill, "font-size": spec.size, "font-weight": weight, "font-family": titleStyle.fontFamily
+    })) t.setAttribute(k, v);
+    t.textContent = content;
+    svg.append(t);
+  };
+  const muted = getComputedStyle(subtitleEl).color;
+  text(titleEl.textContent.trim(), layout.title, EXPORT_TEXT.title, { weight: titleWeight });
+  text(subtitleEl.textContent.trim(), layout.subtitle, EXPORT_TEXT.subtitle, { fill: muted });
+  panels.forEach((panel, i) => {
+    const clone = panel.cloneNode(true);
+    clone.querySelectorAll('[aria-label="tip"]').forEach((n) => n.remove());
+    clone.setAttribute("x", pad);
+    clone.setAttribute("y", layout.panels[i]);
+    // Plot's stylesheet sets height: auto, which a nested SVG reads as 100%.
+    clone.style.width = `${clone.getAttribute("width")}px`;
+    clone.style.height = `${heights[i]}px`;
+    svg.append(clone);
+  });
+  if (noteEl) text(noteEl.textContent.trim(), layout.note, EXPORT_TEXT.note, { fill: muted });
+  text(caption, layout.caption, EXPORT_TEXT.caption, { fill: muted });
+
+  const img = new Image();
+  img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}`;
+  await img.decode();
+  const canvas = document.createElement("canvas");
+  canvas.width = W * 2;
+  canvas.height = H * 2;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(2, 2);
+  ctx.drawImage(img, 0, 0, W, H);
+  return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+}
+```
+
+```{ojs}
+//| echo: false
+// @font-face rules for `family` with their files as data: URLs, read from
+// the page's stylesheets. A cross-origin sheet (the theme's Google Fonts
+// import) hides its rules, so its text is fetched. Offline → "".
+async function inlineFonts(family, weights) {
+  try {
+    const sources = [];
+    const visit = async (sheet) => {
+      let rules;
+      try {
+        rules = sheet.cssRules;
+      } catch {
+        if (sheet.href) sources.push({ text: await (await fetch(sheet.href)).text(), base: sheet.href });
+        return;
+      }
+      for (const rule of rules) {
+        if (rule instanceof CSSImportRule && rule.styleSheet) await visit(rule.styleSheet);
+        else if (rule instanceof CSSFontFaceRule) sources.push({ text: rule.cssText, base: sheet.href ?? document.baseURI });
+      }
+    };
+    for (const sheet of document.styleSheets) await visit(sheet);
+    const faces = sources.flatMap(({ text, base }) =>
+      parseFontFaces(text).map((f) => ({ ...f, url: new URL(f.url, base).href }))
+    );
+    const rules = await Promise.all(pickFontFaces(faces, family, weights).map(async (f) => {
+      const blob = await (await fetch(f.url)).blob();
+      const data = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+      return `@font-face { font-family: "${f.family}"; font-style: normal; font-weight: ${f.weight}; src: url(${data}); }`;
+    }));
+    return rules.join("\n");
+  } catch {
+    return "";
+  }
+}
+```
+
 ```{=html}
 <style>
 .picker-group { margin-bottom: 0.75rem; }
@@ -341,6 +512,8 @@ function drawPanel(list, { label, reference, zeroFloor = false, type, labelKind,
 .radio-group legend { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; }
 .radio-item { display: block; font-size: 0.9rem; }
 .radio-group.disabled { opacity: 0.5; }
+.export-group { margin-top: 1rem; }
+.export-group legend { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; }
 .chart-title { font-size: 1.25rem; margin: 0; }
 .chart-subtitle { color: var(--bs-secondary-color, #6c757d); margin: 0 0 0.5rem; }
 .chart-note { font-size: 0.85rem; color: var(--bs-secondary-color, #6c757d); }

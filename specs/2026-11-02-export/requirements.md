@@ -26,7 +26,7 @@
   - White background, 16 px padding, text in the page's text colour. The hover tooltip is not exported.
   - Rasterised at 2× (canvas width and height twice the SVG's).
 - **Source caption**: `Source: <sources>. Economic Series Explorer, mortenlorenzen.github.io/economic-series-explorer` — the sources of the exported series by first appearance, `yahoo` → "Yahoo Finance", `fred` → "FRED". An unknown source code is shown as is.
-- **Webfonts**: the page's heading/body font is Source Sans Pro, imported by the cosmo theme from Google Fonts. Before rasterising, the export reads the `@font-face` rules for that family (fetching the stylesheet text when the browser won't expose a cross-origin sheet's rules), keeps the latin subset (the rule whose `unicode-range` covers U+0041 "A", or a rule with no range) for each weight the export uses (400 and 700), fetches those font files and embeds them as `data:` URLs in a `<style>` in the SVG. Plot's own text (ticks, end labels) uses `system-ui`, which needs no inlining.
+- **Webfonts**: the page's heading/body font is Source Sans Pro, imported by the cosmo theme from Google Fonts. Before rasterising, the export reads the `@font-face` rules for that family (fetching the stylesheet text when the browser won't expose a cross-origin sheet's rules), keeps the latin subset (the rule whose `unicode-range` covers U+0041 "A", or a rule with no range) for each weight the export uses (the computed weights of the page text and the chart title), fetches those font files and embeds them as `data:` URLs in a `<style>` in the SVG. Plot's own text (ticks, end labels) uses `system-ui`, which needs no inlining.
   - If the font can't be fetched (offline), the PNG is still made with the fallback fonts in the font stack.
 
 ## Context
