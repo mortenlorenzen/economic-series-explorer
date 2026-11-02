@@ -10,7 +10,7 @@
 - `run-tests.sh` runs `Rscript tests/testthat.R` (testthat, `stop_on_failure = TRUE`) and then `node --test tests/js/`; it exits non-zero if either fails. Uses `set -euo pipefail`; no `package.json` (Node 26 detects ES module syntax); runs from the repo root regardless of the caller's directory.
 - renv: implicit snapshot; `renv.lock` records renv, testthat and its dependencies only. The testthat call lives in `tests/testthat.R` (not inline in the shell script) so renv's dependency scan sees it. `renv/library/` is not committed (renv's own `renv/.gitignore`).
 - `index.qmd` uses only OJS cells, so Quarto renders it with the markdown engine and CI needs no R.
-- `_quarto.yml`: website project, output `_site/`, title "Economic Series Explorer", `js/` listed under `resources` so the module is published.
+- `_quarto.yml`: website project, output `_site/`, title "Economic Series Explorer". `render: ["*.qmd"]` so BRIEF, specs and other Markdown files are never published; `resources: [/js/]` (root-anchored, so `tests/js/` stays out) publishes the module.
 - `build-site.yml` triggers: push to `main` and `workflow_dispatch`. Actions pinned to current major versions: `actions/checkout@v7`, `quarto-dev/quarto-actions/setup@v2` with Quarto 1.10.19, `actions/configure-pages@v6`, `actions/upload-pages-artifact@v5`, `actions/deploy-pages@v5`. Concurrency group `pages`, no cancel of an in-progress deploy.
 - CI does not run the tests in this phase: the tech stack names the Stop hook as the test runner, not CI.
 - LICENSE: MIT, "Copyright (c) 2026 Morten Lorenzen".
@@ -52,7 +52,7 @@ The project SHALL run all tests with `./run-tests.sh`, without network, exiting 
 
 #### Scenario: module import works
 - WHEN the rendered page loads in a browser
-- THEN the OJS cell shows `plottedValue("level", 150, 100)` = 150, with no console errors
+- THEN `_site/` holds only `index.html`, `js/series.js` and Quarto's own files, and the OJS cell shows `plottedValue("level", 150, 100)` = 150, with no console errors
 
 ### Requirement: Deploy
 `build-site.yml` SHALL render the site and deploy it to GitHub Pages on every push to `main`.

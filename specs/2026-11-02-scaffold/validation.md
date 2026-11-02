@@ -3,6 +3,7 @@
 ## Automated
 - [ ] `./run-tests.sh` passes; each scenario has a test
 - [ ] `quarto render` succeeds and `test -f _site/index.html && test -f _site/js/series.js`
+- [ ] Nothing private published: `find _site -not -path '*/site_libs/*' -type f` lists only `index.html`, `js/series.js`, `search.json`, `sitemap.xml`, `robots.txt`
 - [ ] Failure is detected: temporarily breaking a JS assertion makes `./run-tests.sh` exit non-zero (checked once, not committed)
 - [ ] Lint/typecheck: none
 
