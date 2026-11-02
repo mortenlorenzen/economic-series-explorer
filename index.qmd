@@ -1,21 +1,129 @@
 ---
 title: "Economic Series Explorer"
+format:
+  html:
+    page-layout: full
 ---
 
 ```{ojs}
 //| echo: false
-import { toRows } from "./js/series.js"
+import {
+  toRows, presetRange, PRESETS, effectiveStart, anchorAndIndex, colorFor,
+  formatEndLabel, yDomain, declutterValues, canSelect
+} from "./js/series.js"
 
 registry = (await fetch("data/series.json")).json()
-meta = registry[0]
-series = (await fetch(`data/${meta.id}.json`)).json()
-rows = toRows(series)
+registryIndex = new Map(registry.map((s, i) => [s.id, i]))
+// Rate series join with their own panel in phase 6.
+pickable = registry.filter((s) => s.kind === "level")
+DEFAULT_SELECTION = ["sp500", "nasdaq"]
+DEFAULT_PRESET = "10Y"
+```
 
-Plot.plot({
-  title: series.name,
-  width,
-  y: { label: series.unit, grid: true },
-  x: { label: null },
-  marks: [Plot.lineY(rows, { x: "date", y: "value" })]
-})
+::: {.panel-sidebar}
+
+```{ojs}
+//| echo: false
+viewof selected = {
+  const form = html`<div class="picker"></div>`;
+  form.value = DEFAULT_SELECTION.filter((id) => pickable.some((s) => s.id === id));
+  const boxes = new Map();
+  const update = () => {
+    for (const [id, box] of boxes) {
+      box.checked = form.value.includes(id);
+      box.disabled = !canSelect(form.value, id);
+    }
+  };
+  const emit = () => {
+    update();
+    form.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+  for (const category of [...new Set(pickable.map((s) => s.category))]) {
+    const group = html`<fieldset class="picker-group"><legend>${category}</legend></fieldset>`;
+    for (const s of pickable.filter((s) => s.category === category)) {
+      const box = html`<input type="checkbox" value=${s.id}>`;
+      box.onchange = () => {
+        form.value = box.checked
+          ? registry.map((r) => r.id).filter((id) => id === s.id || form.value.includes(id))
+          : form.value.filter((id) => id !== s.id);
+        emit();
+      };
+      boxes.set(s.id, box);
+      group.append(html`<label class="picker-item">${box} ${s.name}</label>`);
+    }
+    form.append(group);
+  }
+  const clear = html`<button type="button" class="btn btn-sm btn-outline-secondary">Deselect All</button>`;
+  clear.onclick = () => {
+    form.value = [];
+    emit();
+  };
+  form.append(clear);
+  update();
+  return form;
+}
+```
+
+```{ojs}
+//| echo: false
+viewof range = {
+  const form = html`<div class="range"><div class="range-label">Date range</div></div>`;
+  const buttons = new Map();
+  const bar = html`<div class="btn-group btn-group-sm" role="group"></div>`;
+  const from = html`<input type="date" class="form-control form-control-sm">`;
+  const to = html`<input type="date" class="form-control form-control-sm">`;
+  const set = (value) => {
+    form.value = value;
+    from.value = value.from;
+    to.value = value.to;
+    for (const [p, b] of buttons) b.classList.toggle("active", p === value.preset);
+  };
+  const emit = () => form.dispatchEvent(new Event("input", { bubbles: true }));
+  for (const preset of Object.keys(PRESETS)) {
+    const b = html`<button type="button" class="btn btn-outline-secondary">${preset}</button>`;
+    b.onclick = () => {
+      set({ ...presetRange(preset, registry), preset });
+      emit();
+    };
+    buttons.set(preset, b);
+    bar.append(b);
+  }
+  const edited = () => {
+    if (!from.value || !to.value) return;
+    set({ from: from.value, to: to.value, preset: null });
+    emit();
+  };
+  from.onchange = edited;
+  to.onchange = edited;
+  form.append(
+    bar,
+    html`<label class="range-input">From ${from}</label>`,
+    html`<label class="range-input">To ${to}</label>`
+  );
+  set({ ...presetRange(DEFAULT_PRESET, registry), preset: DEFAULT_PRESET });
+  return form;
+}
+```
+
+:::
+
+::: {.panel-fill}
+
+```{ojs}
+//| echo: false
+md`Selected: ${selected.join(", ") || "none"} · ${range.from} to ${range.to}`
+```
+
+:::
+
+```{=html}
+<style>
+.picker-group { margin-bottom: 0.75rem; }
+.picker-group legend { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; }
+.picker-item { display: block; font-size: 0.9rem; }
+.picker-item input:disabled + * , .picker-item:has(input:disabled) { opacity: 0.5; }
+.range { margin-top: 1rem; }
+.range-label { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; }
+.range-input { display: block; font-size: 0.85rem; margin-top: 0.5rem; }
+</style>
 ```

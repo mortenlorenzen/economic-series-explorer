@@ -145,3 +145,11 @@ export function declutterValues(values, domain, { top, bottom, gap }) {
   const toValue = (px) => hi - ((px - top) / (bottom - top)) * (hi - lo);
   return declutter(values.map(toPx), { top, bottom, gap }).map(toValue);
 }
+
+export const MAX_SELECTED = 8;
+
+// A box can be ticked while fewer than MAX_SELECTED are, and a ticked box
+// can always be cleared.
+export function canSelect(selected, id, max = MAX_SELECTED) {
+  return selected.includes(id) || selected.length < max;
+}

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   plottedValue, toRows, shiftYears, presetRange, effectiveStart,
   anchorAndIndex, colorFor, formatEndLabel, yDomain, declutter, declutterValues,
+  canSelect,
 } from "../../js/series.js";
 
 test("level is indexed to 100 at the anchor", () => {
@@ -139,4 +140,11 @@ test("declutterValues works in data units on a linear scale", () => {
   assert.equal(a, 150);
   assert.ok(Math.abs((a - b) * 4 - 14) < 1e-9); // 4 px per unit
   assert.ok(b < a);
+});
+
+test("canSelect disables unticked boxes once eight are ticked", () => {
+  const eight = ["a", "b", "c", "d", "e", "f", "g", "h"];
+  assert.equal(canSelect(eight, "i"), false);
+  assert.equal(canSelect(eight, "a"), true);
+  assert.equal(canSelect(eight.slice(0, 7), "i"), true);
 });
