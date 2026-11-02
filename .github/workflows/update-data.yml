@@ -1,0 +1,57 @@
+name: Update data
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      # Always main, so a manual run started from another branch can't merge
+      # that branch's commits along with the data.
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: 4.6.1
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-renv@v2
+      - name: Fetch series
+        run: Rscript get_data.R
+      # main only takes changes through a PR (protect-main ruleset, no
+      # approvals or checks required), so open one and merge it right away.
+      - name: Merge changed data into main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: update-data/${{ github.run_id }}
+        run: |
+          if [ -z "$(git status --porcelain data/)" ]; then
+            echo "No data changes."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git add data/
+          git commit -m "Update series data [automated]"
+          git push -u origin "$BRANCH"
+          gh pr create --base main --head "$BRANCH" \
+            --title "Update series data [automated]" \
+            --body "Daily run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          gh pr merge "$BRANCH" --squash \
+            --subject "Update series data [automated]" --body ""
+          # GitHub may already have deleted it ("Automatically delete head branches").
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null; then
+            git push origin --delete "$BRANCH"
+          fi

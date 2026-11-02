@@ -3,6 +3,11 @@ name: Build site
 on:
   push:
     branches: [main]
+  # Data commits pushed with GITHUB_TOKEN don't trigger `push`, so rebuild
+  # after each successful data run instead.
+  workflow_run:
+    workflows: ["Update data"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -16,6 +21,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
