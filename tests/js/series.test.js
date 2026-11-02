@@ -1,11 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   plottedValue, toRows, shiftYears, presetRange, effectiveStart,
   anchorAndIndex, colorFor, formatEndLabel, yDomain, declutter, declutterValues,
   canSelect, formatChange, panelHeights, PANELS, shownKinds, chartSubtitle,
   displayMode, logScale, actualPoints, formatActual, actualSubtitle, actualAxis,
   createLoader, isDaily, isoWeekKey, windowOverTenYears, downsampleWeekly,
+  exportRows, toCsv, exportFileName, todayLocal,
+  sourceCaption, exportLayout, EXPORT_TEXT, wrapText, parseFontFaces, pickFontFaces,
 } from "../../js/series.js";
 
 test("level is indexed to 100 at the anchor", () => {
@@ -343,4 +346,130 @@ test("downsampleWeekly rounds averages to 7 significant digits", () => {
     pt("2020-01-09", 4523.12), pt("2020-01-15", 2)]);
   assert.equal(out[1].value, 4523.123);
   assert.equal(out[1].plotted, 4523.123);
+});
+
+test("exportRows keeps every point, in order, with mode and rounded plotted", () => {
+  const sp = { id: "sp500", kind: "level", dates: ["2020-01-02", "2020-01-03", "2020-01-06"], values: [3257.85, 3234.85, 3246.28] };
+  const un = { id: "unemployment", kind: "rate", dates: ["2020-01-01", "2020-02-01"], values: [3.6, 3.5] };
+  const list = [sp, un].map((s) => ({ series: s, points: anchorAndIndex(s, "2020-01-01", "2020-12-31").points }));
+  const rows = exportRows("indexed", list);
+  assert.deepEqual(rows.map((r) => `${r.series} ${r.date}`), [
+    "sp500 2020-01-02", "sp500 2020-01-03", "sp500 2020-01-06",
+    "unemployment 2020-01-01", "unemployment 2020-02-01",
+  ]);
+  assert.equal(rows[0].plotted, 100);
+  assert.equal(rows[0].value, 3257.85);
+  assert.equal(rows[3].plotted, 0);
+  assert.equal(rows[4].plotted, -0.1); // 3.5 - 3.6 is -0.10000000000000009
+  assert.ok(rows.every((r) => r.mode === "indexed"));
+});
+
+test("exportRows writes 99.99999999999999 as 100", () => {
+  const rows = exportRows("indexed", [{ series: { id: "x" }, points: [{ date: "2020-01-01", value: 1, plotted: 99.99999999999999 }] }]);
+  assert.equal(rows[0].plotted, 100);
+  assert.equal(toCsv(rows), "series,date,value,plotted,mode\nx,2020-01-01,1,100,indexed\n");
+});
+
+test("exportRows in actual mode has plotted equal to value", () => {
+  const s = { id: "treasury10yr", dates: ["2020-01-02", "2020-01-03"], values: [1.88, 1.8] };
+  const rows = exportRows("actual", [{ series: s, points: actualPoints(s, "2020-01-01", "2020-12-31") }]);
+  assert.ok(rows.every((r) => r.mode === "actual" && r.plotted === r.value));
+  assert.equal(rows.length, 2);
+});
+
+test("exportRows uses full resolution, not weekly averages", () => {
+  const dates = [];
+  for (let t = Date.UTC(2000, 0, 3); t <= Date.UTC(2020, 11, 31); t += 86400000) {
+    const d = new Date(t);
+    if (d.getUTCDay() % 6 !== 0) dates.push(d.toISOString().slice(0, 10));
+  }
+  const s = { id: "sp500", kind: "level", dates, values: dates.map((_, i) => 100 + i) };
+  const points = anchorAndIndex(s, "2000-01-01", "2020-12-31").points;
+  assert.ok(windowOverTenYears("2000-01-01", "2020-12-31"));
+  assert.equal(exportRows("indexed", [{ series: s, points }]).length, dates.length);
+});
+
+test("toCsv writes the header and one line per row", () => {
+  const csv = toCsv([
+    { series: "sp500", date: "2016-10-31", value: 2126.15, plotted: 100, mode: "indexed" },
+    { series: "unemployment", date: "2016-10-01", value: 4.9, plotted: 0, mode: "indexed" },
+  ]);
+  assert.equal(csv, "series,date,value,plotted,mode\nsp500,2016-10-31,2126.15,100,indexed\nunemployment,2016-10-01,4.9,0,indexed\n");
+});
+
+test("exportFileName matches the brief's example", () => {
+  assert.equal(
+    exportFileName(["sp500", "nasdaq"], "indexed", "2016-10-31", "2026-10-30", "2026-10-30"),
+    "sp500+nasdaq_indexed_2016-10-31_2026-10-30_2026-10-30.csv"
+  );
+  assert.equal(exportFileName(["gdp"], "actual", "2000-01-01", "2026-10-30", "2026-11-02", "png"),
+    "gdp_actual_2000-01-01_2026-10-30_2026-11-02.png");
+});
+
+test("todayLocal uses the local calendar date", () => {
+  assert.equal(todayLocal(new Date(2026, 0, 5, 23, 59)), "2026-01-05");
+});
+
+test("sourceCaption names sources by first appearance", () => {
+  assert.equal(
+    sourceCaption(["yahoo", "fred", "yahoo"]),
+    "Source: Yahoo Finance, FRED. Economic Series Explorer, mortenlorenzen.github.io/economic-series-explorer"
+  );
+  assert.match(sourceCaption(["bls"]), /^Source: bls\. /);
+});
+
+test("exportLayout stacks panels at their heights between header and caption", () => {
+  const one = exportLayout([480]);
+  assert.ok(one.title < one.subtitle && one.subtitle < one.panels[0]);
+  assert.equal(one.note, null);
+  assert.ok(one.caption > one.panels[0] + 480);
+  assert.ok(one.height > one.caption);
+  const two = exportLayout([288, 192], { note: 1 });
+  assert.equal(two.panels[1], two.panels[0] + 288);
+  assert.ok(two.note > two.panels[1] + 192 && two.caption > two.note);
+  assert.equal(two.height - one.height, EXPORT_TEXT.note.line);
+});
+
+test("exportLayout makes room for wrapped lines", () => {
+  const one = exportLayout([480]);
+  const wrapped = exportLayout([480], { subtitle: 2, note: 3, caption: 2 });
+  assert.equal(wrapped.panels[0] - one.panels[0], EXPORT_TEXT.subtitle.line);
+  const noteTop = wrapped.panels[0] + 480;
+  assert.ok(wrapped.caption > noteTop + 3 * EXPORT_TEXT.note.line);
+  assert.equal(wrapped.height - one.height, EXPORT_TEXT.subtitle.line + 3 * EXPORT_TEXT.note.line + EXPORT_TEXT.caption.line);
+});
+
+test("wrapText breaks at words to fit the width", () => {
+  const measure = (t) => t.length * 10;
+  assert.deepEqual(wrapText("aaa bbb ccc dd", 75, measure), ["aaa bbb", "ccc dd"]);
+  assert.deepEqual(wrapText("short", 75, measure), ["short"]);
+  assert.deepEqual(wrapText("averyveryverylongword x", 75, measure), ["averyveryverylongword", "x"]);
+  assert.deepEqual(wrapText("", 75, measure), [""]);
+});
+
+const fontCss = readFileSync(new URL("../fixtures/google_fonts.css", import.meta.url), "utf8");
+
+test("parseFontFaces reads family, style, weight, range and url", () => {
+  const faces = parseFontFaces(fontCss);
+  assert.equal(faces.length, 6);
+  assert.deepEqual(faces[2], {
+    family: "Source Sans Pro", style: "normal", weight: "400",
+    unicodeRange: "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD",
+    url: "https://fonts.gstatic.com/s/sourcesanspro/v22/6xK3dSBYKcSV-LCoeQqfX1RYOo3qOK7l.woff2",
+  });
+  assert.equal(faces[5].url, "other.woff2");
+  assert.equal(faces[5].unicodeRange, null);
+});
+
+test("pickFontFaces keeps only the latin normal face per weight", () => {
+  const picked = pickFontFaces(parseFontFaces(fontCss), "source sans pro", [400, 700, 400]);
+  assert.deepEqual(picked.map((f) => f.url.split("/").pop()), [
+    "6xK3dSBYKcSV-LCoeQqfX1RYOo3qOK7l.woff2", "6xKydSBYKcSV-LCoeQqfX1RYOo3ig4vwlxdu.woff2",
+  ]);
+  assert.deepEqual(pickFontFaces(parseFontFaces(fontCss), "Source Sans Pro", [300]), []);
+});
+
+test("pickFontFaces accepts a variable-font weight range", () => {
+  const faces = parseFontFaces("@font-face{font-family:\"V\";font-weight:300 700;src:url(v.woff2)}");
+  assert.equal(pickFontFaces(faces, "V", [400]).length, 1);
 });

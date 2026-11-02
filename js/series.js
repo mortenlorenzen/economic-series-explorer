@@ -327,3 +327,143 @@ export function downsampleWeekly(points) {
   out.push(points[points.length - 1]);
   return out;
 }
+
+// Export rows: full-resolution points of the exported series, in the order
+// given (registry order), as {series, date, value, plotted, mode}.
+// `plotted` is rounded to the 7 significant digits the data files store.
+export function exportRows(mode, list) {
+  return list.flatMap(({ series, points }) =>
+    points.map((p) => ({
+      series: series.id, date: p.date, value: p.value,
+      plotted: Number(p.plotted.toPrecision(7)), mode
+    }))
+  );
+}
+
+export const CSV_COLUMNS = ["series", "date", "value", "plotted", "mode"];
+
+// Long-format CSV; no quoting, since ids, dates and numbers hold no commas.
+export function toCsv(rows) {
+  const lines = [CSV_COLUMNS.join(",")];
+  for (const r of rows) lines.push(CSV_COLUMNS.map((c) => String(r[c])).join(","));
+  return lines.join("\n") + "\n";
+}
+
+// "<ids joined by +>_<mode>_<from>_<to>_<today>.<ext>"
+export function exportFileName(ids, mode, from, to, today, ext = "csv") {
+  return `${ids.join("+")}_${mode}_${from}_${to}_${today}.${ext}`;
+}
+
+// The viewer's local date as "YYYY-MM-DD".
+export function todayLocal(now = new Date()) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+const SOURCE_NAMES = { yahoo: "Yahoo Finance", fred: "FRED" };
+export const SITE_CREDIT = "Economic Series Explorer, mortenlorenzen.github.io/economic-series-explorer";
+
+// PNG caption: the exported series' sources by first appearance.
+export function sourceCaption(sources) {
+  const names = [...new Set(sources)].map((s) => SOURCE_NAMES[s] ?? s);
+  return `Source: ${names.join(", ")}. ${SITE_CREDIT}`;
+}
+
+// Vertical layout of the exported SVG: title, subtitle, the panels stacked
+// at their screen heights, the optional note and the caption. Text y values
+// are baselines.
+export const EXPORT_TEXT = {
+  pad: 16,
+  title: { size: 20, line: 28 },
+  subtitle: { size: 14, line: 22 },
+  note: { size: 12, line: 18 },
+  caption: { size: 12, line: 18 },
+};
+
+// `lines` gives each text block's line count after wrapping; note 0 = no note.
+// Each text value is the first line's baseline.
+export function exportLayout(panelHeights, { title = 1, subtitle = 1, note = 0, caption = 1 } = {}) {
+  const { pad } = EXPORT_TEXT;
+  let y = pad;
+  const block = (t, n) => {
+    const b = y + t.line - (t.line - t.size) / 2 - Math.round(t.size * 0.2);
+    y += t.line * n;
+    return b;
+  };
+  const out = { title: block(EXPORT_TEXT.title, title), subtitle: block(EXPORT_TEXT.subtitle, subtitle) };
+  y += 4;
+  out.panels = panelHeights.map((h) => {
+    const top = y;
+    y += h;
+    return top;
+  });
+  out.note = note ? block(EXPORT_TEXT.note, note) : null;
+  y += 4;
+  out.caption = block(EXPORT_TEXT.caption, caption);
+  out.height = y + pad;
+  return out;
+}
+
+// Greedy word wrap: lines no wider than maxWidth by `measure(text)`; a single
+// word wider than that gets a line of its own.
+export function wrapText(text, maxWidth, measure) {
+  const lines = [];
+  let line = "";
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    const next = line ? `${line} ${word}` : word;
+    if (line && measure(next) > maxWidth) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = next;
+    }
+  }
+  if (line) lines.push(line);
+  return lines.length ? lines : [""];
+}
+
+// @font-face rules in a stylesheet's text, as {family, style, weight,
+// unicodeRange, url}. Only the first url() of each src is kept.
+export function parseFontFaces(cssText) {
+  const faces = [];
+  for (const [, body] of cssText.matchAll(/@font-face\s*\{([^}]*)\}/g)) {
+    const prop = (name) => body.match(new RegExp(`(?:^|;)\\s*${name}\\s*:\\s*([^;]+)`))?.[1].trim() ?? null;
+    const url = body.match(/url\(\s*(['"]?)([^'")]+)\1\s*\)/)?.[2];
+    if (!url) continue;
+    faces.push({
+      family: (prop("font-family") ?? "").replace(/^['"]|['"]$/g, ""),
+      style: prop("font-style") ?? "normal",
+      weight: prop("font-weight") ?? "400",
+      unicodeRange: prop("unicode-range"),
+      url,
+    });
+  }
+  return faces;
+}
+
+// Does a unicode-range list cover a code point? No range covers everything.
+function coversCodePoint(range, cp) {
+  if (!range) return true;
+  return range.split(",").some((part) => {
+    const [a, b] = part.trim().replace(/^U\+/i, "").split("-");
+    if (a.includes("?")) {
+      return cp >= parseInt(a.replace(/\?/g, "0"), 16) && cp <= parseInt(a.replace(/\?/g, "F"), 16);
+    }
+    return cp >= parseInt(a, 16) && cp <= parseInt(b ?? a, 16);
+  });
+}
+
+// The faces to inline: normal style, the given family, one latin face (the
+// one covering "A") per wanted weight. A weight range "300 700" covers 400.
+export function pickFontFaces(faces, family, weights) {
+  const picked = [];
+  for (const w of weights) {
+    const face = faces.find((f) => {
+      const [lo, hi = lo] = f.weight.split(/\s+/).map(Number);
+      return f.family.toLowerCase() === family.toLowerCase() && f.style === "normal" &&
+        lo <= w && w <= hi && coversCodePoint(f.unicodeRange, 0x41);
+    });
+    if (face && !picked.includes(face)) picked.push(face);
+  }
+  return picked;
+}
