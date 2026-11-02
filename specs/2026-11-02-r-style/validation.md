@@ -7,7 +7,7 @@
 - [x] `renv::status()` reports a consistent state
 
 ## Manual
-- [ ] The next daily `update-data.yml` run after merge is green
+- [x] The first `update-data.yml` run after merge is green (manual run 41530641698, data merged in #18)
 
 ## Done when
 All boxes ticked, CHANGELOG updated, PR open.
