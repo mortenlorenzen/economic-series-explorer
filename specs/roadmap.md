@@ -7,7 +7,7 @@ Very small phases. Each phase = one branch = one `specs/YYYY-MM-DD-feature-name/
 - [x] Phase 3 — Registry and pipeline: all eleven series and descriptions, registry validation, `transform` lookup (`yoy`), retries, staleness and regression checks (covers BRIEF §6.1, §6.2)
 - [x] Phase 4 — Daily data workflow: `update-data.yml` committing changed `data/`, `build-site.yml` also on `workflow_run` (covers BRIEF §6.3 workflows)
 - [x] Phase 5 — Front end core: date x-axis, category picker (max 8), date-range presets and From/To, indexed levels in one panel (covers BRIEF §6.4, §6.5 levels only)
-- [ ] Phase 6 — Rates and stacked panels (covers BRIEF §6.5 rates, two panels)
+- [x] Phase 6 — Rates and stacked panels (covers BRIEF §6.5 rates, two panels)
 - [ ] Phase 7 — Actual-values mode and log scale (covers BRIEF §6.4 Display/Y-axis, §6.6 actual values)
 - [ ] Phase 8 — Loading cache and downsampling (covers BRIEF §6.4 Loading, §6.6 Downsampling)
 - [ ] Phase 9 — PNG and CSV export (covers BRIEF §6.7 export)
