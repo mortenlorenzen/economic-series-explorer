@@ -18,10 +18,10 @@
   - The tooltip's actual value is the average of the stored values in that week.
   - Indexed mode averages the plotted (indexed) values, computed on raw data first; actual mode averages the stored values.
 - **Exact points**: the first point (the anchor in indexed mode, 100 or 0) and the last point are always drawn as they are, not averaged. Other points in their weeks are averaged into one point at that week's last remaining date. Keeping the last point exact keeps the end label at the real last value ("name plus last value", BRIEF §6.6).
-- **What downsampling changes**: only the rows drawn.
+- **What downsampling changes**: only the rows drawn. `drawPanel` applies it from its x-domain, so both modes share one rule.
   - Anchor, log rule, empty-window and left-out checks use the raw points.
   - The y-domain and label positions use the drawn rows.
-- **Tooltip**: on a downsampled series, the plotted and value channels are weekly averages, so the date row reads "Week to <date>" instead of "Date". This keeps the averaged values from being read as a single day's.
+- **Tooltip**: on an averaged point, the plotted and value channels are weekly averages, so the Date row shows "Week to <date>" rather than the bare date. This keeps the averaged values from being read as a single day's. Exact points (first, last, and every point when not downsampled) show the bare date.
 
 ## Context
 - Roadmap Phase 8 (BRIEF §6.4 Loading, §6.6 Downsampling). Decisions log: weekly averages above 10 years, raw data for indexing and export.
