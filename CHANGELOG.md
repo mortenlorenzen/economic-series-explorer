@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-11-05
+- Core visual: a one-page explainer of what makes the app work (`visuals/economic-series-explorer/`), made with the visual skill's core lens; not part of the site
+
 ## 2026-11-02
 - R code style: `get_data.R` rewritten with dplyr, purrr and the native pipe; output unchanged
 - More series: Hang Seng, CSI 300 China Tracker, MSCI AC World ETF, Gold, Crude Oil (WTI), Copper, Bitcoin, Consumer Prices Denmark and the Federal Funds Rate; selected lines never share a colour

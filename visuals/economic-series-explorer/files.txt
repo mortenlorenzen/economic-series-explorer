@@ -1,0 +1,23 @@
+# docs: what it is, as built
+README.md
+CLAUDE.md
+BRIEF-AS-BUILT.md
+CHANGELOG.md
+about.qmd
+
+# docs: mission, constraints, open questions, lessons
+specs/mission.md
+specs/tech-stack.md
+specs/roadmap.md
+specs/questions.md
+specs/retro.md
+
+# rules in code: registry and daily pipeline
+series.csv
+get_data.R
+.github/workflows/update-data.yml
+.github/workflows/build-site.yml
+
+# rules in code: chart logic and what the interface allows
+js/series.js
+index.qmd

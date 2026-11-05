@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What makes the Economic Series Explorer work</title>
+<style>
+/* Fjord theme: white paper cards on a pale blue-grey desk, navy ink, one cobalt accent.
+   Taken from the AI-kontor reference page (assets/reference.html). Inline this file unchanged. */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,700;0,8..60,800;1,8..60,400&display=swap");
+
+:root {
+  --bg: #e6ebf4; --surface: #ffffff; --ink: #0e1a33; --ink-2: #29395b;
+  --muted: #55678b; --line: #c2cce0; --line-2: #7b8caf;
+  --accent: #2347a6;
+  --green: #2f6b3f; --amber: #9a6412; --red: #8e2424;
+  --serif: "Source Serif 4", Georgia, serif;
+  --sans: "Inter", -apple-system, "Helvetica Neue", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans);
+       font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1000px; margin: 0 auto; padding: 72px 32px 48px; }
+
+/* Masthead */
+.tag { display: inline-block; border: 1px solid var(--accent); color: var(--accent);
+       font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase;
+       padding: 6px 12px; border-radius: 2px; }
+h1 { font-family: var(--serif); font-weight: 800; font-size: 80px; line-height: 1.02;
+     letter-spacing: -.02em; margin: 28px 0 22px; }
+.standfirst { font-size: 21px; line-height: 1.5; color: var(--ink-2); max-width: 46ch; margin: 0; }
+.standfirst em { font-family: var(--serif); font-style: italic; color: var(--accent); }
+.note { margin-top: 18px; font-size: 14px; color: var(--muted); max-width: 70ch; }
+
+/* Sektioner */
+section { margin-top: 96px; padding-top: 40px; border-top: 1px solid var(--line-2); }
+.sec-head { display: grid; grid-template-columns: 120px 1fr; gap: 8px 24px; align-items: start; }
+.numeral { font-family: var(--serif); font-weight: 700; font-size: 88px; line-height: .9; color: var(--ink); }
+.kicker { font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--accent); }
+h2 { font-family: var(--serif); font-weight: 700; font-size: 36px; line-height: 1.15; margin: 6px 0 10px; }
+.lede { font-size: 17px; color: var(--ink-2); margin: 0; max-width: 62ch; }
+.sec-body { margin-top: 36px; }
+
+/* Figur */
+.figure { margin: 36px 0 8px; padding: 28px 24px 22px; background: var(--surface);
+          border: 1px solid var(--line); border-radius: 4px; }
+.figure .fig-label { font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase;
+                     color: var(--muted); text-align: center; margin-bottom: 18px; }
+.figure .diagram { display: block; margin: 0 auto; width: 100%; max-width: 860px; height: auto; }
+.figure figcaption { margin: 18px auto 0; padding-top: 14px; border-top: 1px solid var(--line);
+                     font-size: 13.5px; font-style: italic; font-family: var(--serif); color: var(--ink-2);
+                     text-align: center; max-width: 56ch; line-height: 1.55; }
+.diagram .node rect, .diagram .node polygon { fill: var(--bg); stroke: var(--ink); stroke-width: 1.5; }
+.diagram .node text { font-family: var(--serif); font-weight: 700; font-size: 14px; fill: var(--ink); }
+.diagram a.node:hover rect, .diagram a.node:hover polygon { stroke: var(--accent); stroke-width: 3; }
+.diagram a.node:hover text { fill: var(--accent); }
+.diagram .edge { stroke: var(--ink); stroke-width: 1.5; fill: none; }
+.diagram .loop { stroke: var(--accent); stroke-width: 3; fill: none; }
+.diagram .frame { fill: none; stroke: var(--line-2); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.diagram .elabel { font-family: var(--sans); font-size: 10px; font-weight: 700; letter-spacing: .13em; fill: var(--muted); }
+.diagram .elabel.acc { fill: var(--accent); }
+.diagram .nnote { font-family: var(--sans); font-weight: 400; font-size: 12px; fill: var(--ink-2); }
+
+/* Kort */
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 22px 22px 20px;
+        border-top: 4px solid var(--muted); }
+.card.green { border-top-color: var(--green); } .card.amber { border-top-color: var(--amber); }
+.card.red { border-top-color: var(--red); } .card.acc { border-top-color: var(--accent); }
+.card .ck { font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
+.card h3 { font-family: var(--serif); font-weight: 700; font-size: 22px; line-height: 1.2; margin: 8px 0 10px; }
+.card p { margin: 0 0 10px; font-size: 15px; color: var(--ink-2); }
+.verdict { font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; }
+.verdict.green { color: var(--green); } .verdict.amber { color: var(--amber); } .verdict.red { color: var(--red); }
+
+/* Afdelinger (trinkort) */
+.dept { display: grid; grid-template-columns: 84px 1fr; gap: 0 24px; background: var(--surface);
+        border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 4px;
+        padding: 26px 26px 22px; margin-bottom: 18px; scroll-margin-top: 24px; }
+.dept.qc { border-left-color: var(--ink); }
+.dept .num { font-family: var(--serif); font-weight: 700; font-size: 64px; line-height: .9; color: var(--ink); }
+.dept-top { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+.dept h3 { font-family: var(--serif); font-weight: 700; font-size: 26px; margin: 0; }
+.chip { font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--accent); white-space: nowrap; }
+.dept .what { margin: 6px 0 16px; color: var(--ink-2); font-size: 16px; }
+.facets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border-top: 1px solid var(--line); }
+.facet { padding: 12px 14px 4px 0; }
+.facet + .facet { padding-left: 14px; border-left: 1px solid var(--line); }
+.facet .fl { font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
+.facet p { margin: 4px 0 8px; font-size: 14.5px; line-height: 1.5; }
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-top: 10px; border-top: 1px solid var(--line); }
+.split > div { padding: 12px 14px 0 0; }
+.split > div + div { padding-left: 14px; border-left: 1px solid var(--line); }
+.split .fl { font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
+.split .fl.acc { color: var(--accent); }
+.split p { margin: 4px 0 6px; font-size: 14.5px; line-height: 1.5; }
+.auto { font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; }
+code { font-family: Menlo, monospace; font-size: 13px; background: var(--bg); padding: 1px 5px; border-radius: 3px; }
+
+/* Tabel */
+table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; }
+th { font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--muted);
+     text-align: left; padding: 12px 16px; background: var(--bg); border-bottom: 1px solid var(--line-2); }
+td { padding: 14px 16px; border-bottom: 1px solid var(--line); font-size: 15px; vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+td.n { font-family: var(--serif); font-weight: 700; font-size: 22px; color: var(--accent); width: 48px; }
+td.loc { text-align: right; white-space: nowrap; }
+
+/* Push-pull */
+.pushpull { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.pp { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--muted);
+      border-radius: 4px; padding: 22px 24px; }
+.pp.acc { border-left-color: var(--accent); }
+.pp .big { font-family: var(--serif); font-weight: 700; font-size: 60px; line-height: .9; }
+.pp.acc .big { color: var(--accent); }
+.pp h3 { font-family: var(--serif); font-size: 22px; margin: 10px 0 12px; }
+.pp ul { margin: 0; padding-left: 1.1em; }
+.pp li { margin: 6px 0; font-size: 15px; color: var(--ink-2); }
+
+/* Footer */
+footer { margin-top: 110px; padding-top: 28px; border-top: 1px solid var(--line-2);
+         display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+.f-label { font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+.f-content { font-family: var(--serif); font-size: 17px; }
+.f-sub, .f-path { font-family: var(--sans); font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+@media (max-width: 760px) {
+  .wrap { padding: 40px 16px 32px; }
+  h1 { font-size: 52px; }
+  .standfirst { font-size: 18px; }
+  section { margin-top: 64px; }
+  .sec-head { grid-template-columns: 1fr; }
+  .numeral { font-size: 64px; }
+  h2 { font-size: 28px; }
+  .grid3, .pushpull, footer { grid-template-columns: 1fr; }
+  .dept { grid-template-columns: 1fr; padding: 20px 18px 16px; }
+  .dept .num { font-size: 44px; margin-bottom: 6px; }
+  .facets { grid-template-columns: 1fr 1fr; }
+  .facet:nth-child(3) { padding-left: 0; border-left: 0; }
+  .split { grid-template-columns: 1fr; }
+  .split > div + div { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); }
+  table, thead, tbody, tr, td, th { display: block; }
+  thead { display: none; }
+  tr { border-bottom: 1px solid var(--line); padding: 10px 0; }
+  td { border: 0; padding: 4px 16px; }
+  td.loc { text-align: left; }
+}
+
+/* Question list */
+.qlist { list-style: none; margin: 0; padding: 0; counter-reset: q; }
+.qlist li { counter-increment: q; display: grid; grid-template-columns: 56px 1fr; gap: 0 16px;
+            background: var(--surface); border: 1px solid var(--line); border-radius: 4px;
+            padding: 16px 20px; margin-bottom: 12px; font-size: 15.5px; color: var(--ink-2); }
+.qlist li::before { content: counter(q, decimal-leading-zero); font-family: var(--serif); font-weight: 700;
+                    font-size: 28px; line-height: 1.1; color: var(--accent); }
+
+/* Paper table helpers */
+td.layer { font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); white-space: nowrap; }
+td.el { font-family: var(--serif); font-weight: 700; font-size: 16px; white-space: nowrap; }
+.table-wrap { overflow-x: auto; }
+
+@media (max-width: 760px) {
+  .qlist li { grid-template-columns: 1fr; }
+  td.el, td.layer { white-space: normal; }
+}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <span class="tag">Economic Series Explorer · core lens · repo</span>
+  <h1>What makes the Economic Series Explorer work</h1>
+  <p class="standfirst">A good chart here is an <em>honest comparison</em>: twenty predefined series, prepared daily and served as static files, land on one date axis from a common start in the browser. The numbers are never changed for speed, and a run would rather fail than publish bad data.</p>
+  <p class="note">Core lens on the repo: docs, specs, the registry, get_data.R, the workflows, js/series.js and index.qmd. Tools such as Quarto, Observable and renv are left out; the architecture they implement is kept. Where specs/ and the brief disagree, specs/ wins.</p>
+</header>
+
+<section id="objective">
+  <div class="sec-head">
+    <div class="numeral">01</div>
+    <div><div class="kicker">Objective</div>
+      <h2>Compare series on a shared date axis, without bending the numbers</h2>
+      <p class="lede">A personal tool, published as a public site. A good result is recognised by three things.</p></div>
+  </div>
+  <div class="sec-body grid3">
+    <div class="card acc"><div class="ck">Pipeline</div><p>All series in the registry (twenty) load with full history and the daily pipeline stays green.</p></div>
+    <div class="card acc"><div class="ck">Chart</div><p>Any 1–8 series can be compared indexed on one date axis, levels and rates together.</p></div>
+    <div class="card acc"><div class="ck">Registry</div><p>Adding a series is one row in <code>series.csv</code> and nothing else.</p></div>
+  </div>
+</section>
+
+<section id="architecture">
+  <div class="sec-head">
+    <div class="numeral">02</div>
+    <div><div class="kicker">Architecture</div>
+      <h2>Prepared daily, served static, computed in the browser</h2>
+      <p class="lede">Static files only: no server, no R at runtime. The browser fetches only files in <code>data/</code>. Each rule forces something.</p></div>
+  </div>
+  <div class="sec-body grid3">
+    <div class="card acc"><div class="ck">Static files only</div><h3>Predefined series only</h3><p>Free choice in the browser would need a proxy server: Yahoo blocks cross-site browser requests and the FRED API needs a key a public page cannot hide.</p></div>
+    <div class="card acc"><div class="ck">Data prepared daily and committed</div><h3>Fail loudly</h3><p><code>update-data.yml</code> runs <code>get_data.R</code> at 06:00 UTC. Changed data reaches <code>main</code> through a PR the workflow opens and squash-merges itself; <code>build-site.yml</code> deploys only after a successful run. A failed run commits nothing.</p></div>
+    <div class="card acc"><div class="ck">All computation in the browser</div><h3>Pure functions</h3><p>Indexing, anchoring, downsampling, colours and export logic live in <code>js/series.js</code>, testable without a browser. Expected size: ~500 KB for the longest daily series, 1–3 MB for all of <code>data/</code>.</p></div>
+  </div>
+  <figure class="figure" style="margin-top:28px">
+    <div class="fig-label">Two halves and one handover</div>
+    <svg class="diagram" viewBox="0 0 900 610" role="img" aria-label="GitHub Actions: update-data.yml runs get_data.R daily at 06:00 UTC; get_data.R reads series.csv and writes data/&lt;id&gt;.json all or nothing; build-site.yml deploys to GitHub Pages. The accented handover goes to the browser, where index.qmd uses js/series.js.">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0e1a33"/></marker>
+        <marker id="arr-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2347a6"/></marker>
+      </defs>
+      <rect class="frame" x="20" y="20" width="280" height="575" rx="4"/>
+      <text class="elabel" x="36" y="44">GITHUB ACTIONS</text>
+      <rect class="frame" x="620" y="20" width="260" height="575" rx="4"/>
+      <text class="elabel" x="636" y="44">BROWSER</text>
+      <g class="node"><rect x="50" y="60" width="220" height="44" rx="22"/><text x="160" y="87" text-anchor="middle">update-data.yml</text></g>
+      <a class="node" href="#guardrails"><rect x="50" y="150" width="220" height="140" rx="3"/><text x="160" y="178" text-anchor="middle">get_data.R</text><text class="nnote" x="160" y="204" text-anchor="middle">validate registry</text><text class="nnote" x="160" y="223" text-anchor="middle">three tries</text><text class="nnote" x="160" y="242" text-anchor="middle">staleness</text><text class="nnote" x="160" y="261" text-anchor="middle">regression check</text></a>
+      <g class="node"><rect x="50" y="490" width="220" height="44" rx="3"/><text x="160" y="517" text-anchor="middle">build-site.yml</text></g>
+      <a class="node" href="#model"><rect x="380" y="150" width="200" height="100" rx="3"/><text x="480" y="178" text-anchor="middle">series.csv</text><text class="nnote" x="480" y="204" text-anchor="middle">one row per series</text><text class="nnote" x="480" y="223" text-anchor="middle">kind, transform,</text><text class="nnote" x="480" y="242" text-anchor="middle">max_stale_days</text></a>
+      <g class="node"><rect x="380" y="350" width="200" height="90" rx="3"/><text x="480" y="378" text-anchor="middle">data/&lt;id&gt;.json</text><text class="nnote" x="480" y="404" text-anchor="middle">full history</text><text class="nnote" x="480" y="423" text-anchor="middle">7 significant digits</text></g>
+      <a class="node" href="#logic"><rect x="640" y="150" width="220" height="140" rx="3"/><text x="750" y="178" text-anchor="middle">js/series.js</text><text class="nnote" x="750" y="204" text-anchor="middle">effective start</text><text class="nnote" x="750" y="223" text-anchor="middle">anchor</text><text class="nnote" x="750" y="242" text-anchor="middle">downsampling</text><text class="nnote" x="750" y="261" text-anchor="middle">colours</text></a>
+      <a class="node" href="#logic"><rect x="640" y="400" width="220" height="100" rx="3"/><text x="750" y="428" text-anchor="middle">index.qmd</text><text class="nnote" x="750" y="454" text-anchor="middle">controls, chart, export</text><text class="nnote" x="750" y="473" text-anchor="middle">cached in a Map</text></a>
+      <line class="edge" x1="160" y1="104" x2="160" y2="147" marker-end="url(#arr)"/>
+      <text class="elabel" x="172" y="131">DAILY 06:00 UTC</text>
+      <line class="edge" x1="380" y1="200" x2="273" y2="200" marker-end="url(#arr)"/>
+      <path class="edge" d="M270,260 L340,260 L340,395 L377,395" marker-end="url(#arr)"/>
+      <text class="elabel" x="348" y="306">ALL OR</text>
+      <text class="elabel" x="348" y="320">NOTHING</text>
+      <path class="edge" d="M480,440 L480,512 L273,512" marker-end="url(#arr)"/>
+      <line class="edge" x1="750" y1="400" x2="750" y2="293" marker-end="url(#arr)"/>
+      <path class="loop" d="M160,534 L160,572 L750,572 L750,505" marker-end="url(#arr-acc)"/>
+      <text class="elabel acc" x="455" y="562" text-anchor="middle">GITHUB PAGES</text>
+    </svg>
+    <figcaption>GitHub Actions prepare the data and the site; from the handover on, everything happens in the browser on static files.</figcaption>
+  </figure>
+</section>
+
+<section id="model">
+  <div class="sec-head">
+    <div class="numeral">03</div>
+    <div><div class="kicker">Domain model</div>
+      <h2>Two kinds of series, one registry</h2>
+      <p class="lede"><code>get_data.R</code> names no series itself; everything comes from <code>series.csv</code>. Each row's <code>kind</code> decides the arithmetic, because a ratio of rates is meaningless.</p></div>
+  </div>
+  <div class="sec-body">
+    <div class="table-wrap"><table>
+      <thead><tr><th></th><th><code>level</code></th><th><code>rate</code></th></tr></thead>
+      <tbody>
+        <tr><td class="layer">Indexed as</td><td>100 × value / anchor</td><td>value − anchor, in percentage points</td></tr>
+        <tr><td class="layer">Panel</td><td>Top: "Index, start = 100"</td><td>Bottom: "Change, percentage points"</td></tr>
+        <tr><td class="layer">Log scale</td><td>Allowed when every plotted value is above zero</td><td>Always linear</td></tr>
+        <tr><td class="layer">Examples</td><td>S&amp;P 500, Gold, Real GDP</td><td>Inflation Rate, Unemployment Rate</td></tr>
+      </tbody>
+    </table></div>
+    <p style="margin-top:20px">Each row also carries <code>source</code> (<code>yahoo</code> or <code>fred</code>), <code>transform</code> (<code>none</code> or <code>yoy</code>), <code>unit</code> and <code>max_stale_days</code>. A new transform is one entry in a list in <code>get_data.R</code>.</p>
+  </div>
+</section>
+
+<section id="guardrails">
+  <div class="sec-head">
+    <div class="numeral">04</div>
+    <div><div class="kicker">Guardrails</div>
+      <h2>A daily run that would rather fail than publish bad data</h2>
+      <p class="lede"><code>get_data.R</code> builds every series and collects the errors, so one run reports every broken series. It writes only when all of them pass.</p></div>
+  </div>
+  <div class="sec-body"><div class="table-wrap"><table><thead><tr><th>Guardrail</th><th>Rule</th></tr></thead><tbody>
+<tr><td class="el">Validate the registry</td><td>Ten columns, unique lowercase ids, known <code>source</code>, <code>kind</code> and <code>transform</code>, <code>max_stale_days</code> &gt; 0, no empty text fields. Every problem in one error.</td></tr>
+<tr><td class="el">Fetch and clean</td><td>No keys. Three tries, waiting 2 s and 4 s. Drop NA and duplicate dates; <code>yoy</code> against the same calendar date a year earlier.</td></tr>
+<tr><td class="el">Staleness</td><td>Older than <code>max_stale_days</code> → warning; older than twice that → the run fails.</td></tr>
+<tr><td class="el">Regression</td><td>Fewer observations than the published file → the run fails.</td></tr>
+<tr><td class="el">All or nothing</td><td>A failed run writes nothing, and the site isn't rebuilt.</td></tr>
+</tbody></table></div></div>
+</section>
+
+<section id="logic">
+  <div class="sec-head">
+    <div class="numeral">05</div>
+    <div><div class="kicker">Decision logic</div>
+      <h2>Small rules with large effects</h2>
+      <p class="lede">The chart rules live in <code>js/series.js</code>; the interface rules decide what the user can ask for at all.</p></div>
+  </div>
+  <div class="sec-body"><div class="table-wrap"><table><thead><tr><th>Rule</th><th>What it does</th></tr></thead><tbody>
+<tr><td class="el">Effective start</td><td>The later of From and the latest <code>first_date</code> among selected series. All lines begin together; the subtitle names the series that moved the start.</td></tr>
+<tr><td class="el">Anchor</td><td>First observation on or after the effective start. More than 180 days later → series left out and named in a note.</td></tr>
+<tr><td class="el">Downsampling</td><td>Window longer than 10 years → daily series drawn as weekly averages. Indexing is computed on raw data first; the anchor and the last point are drawn exactly; CSV export uses full resolution.</td></tr>
+<tr><td class="el">At most 8, from 10 colours</td><td>Colours follow registry order; on a clash the later series takes the first free colour. With at most 8 selected and 10 colours, no two lines share one.</td></tr>
+<tr><td class="el">Actual values</td><td>Only with exactly one series; ticking a second returns Display to Indexed.</td></tr>
+<tr><td class="el">Log scale</td><td>Disabled with a tooltip when any plotted level is ≤ 0. WTI oil was negative on 2020-04-20.</td></tr>
+<tr><td class="el">Failed load</td><td>Dropped from the cache, so untick and tick retries it; the other series still plot.</td></tr>
+</tbody></table></div></div>
+</section>
+
+<section id="loops">
+  <div class="sec-head">
+    <div class="numeral">06</div>
+    <div><div class="kicker">Human judgment and feedback</div>
+      <h2>Checks that can fail, and a person who decides</h2>
+      <p class="lede">Unattended runs need a check that can fail, so tests came in phase 1. The decisions stay with the owner.</p></div>
+  </div>
+  <div class="sec-body"><div class="table-wrap"><table><thead><tr><th>Loop</th><th>How it works</th></tr></thead><tbody>
+<tr><td class="el"><code>./run-tests.sh</code></td><td>testthat and <code>node --test</code> on saved fixture data, no network; non-zero exit on failure</td></tr>
+<tr><td class="el">Owner merges</td><td><code>main</code> is protected: every change goes through a PR, merged by the owner. Only the daily data PR is merged by the workflow.</td></tr>
+<tr><td class="el">Questions stop a phase</td><td>Never guess a product decision: undecided → <code>specs/questions.md</code>, and <code>/run-phase</code> stops while a box is unticked.</td></tr>
+<tr><td class="el">Reviewer</td><td>Caught bugs the specs and tests missed, such as a test that failed both series and so proved nothing, and about-page text that overstated facts.</td></tr>
+<tr><td class="el">Retro</td><td>One line per phase in <code>specs/retro.md</code>: what went wrong, what to change in the kit.</td></tr>
+</tbody></table></div></div>
+</section>
+
+<footer>
+  <div><div class="f-label">Curated by</div>
+    <div class="f-content">Morten Lorenzen<div class="f-path">economic-series-explorer (16 files, see files.txt) · Updated 2026-11-02</div></div></div>
+  <div><div class="f-label">Source</div>
+    <div class="f-content"><em>"Economic Series Explorer"</em><div class="f-sub">Morten Lorenzen · 2026-11-02</div></div></div>
+</footer>
+
+</div>
+</body>
+</html>
