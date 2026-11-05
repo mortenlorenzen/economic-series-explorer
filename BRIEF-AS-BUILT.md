@@ -270,6 +270,7 @@ File name: `<ids joined by +>_<mode>_<from>_<to>_<today>.csv`, e.g. `sp500+nasda
 | `.github/workflows/update-data.yml`, `build-site.yml` | Automation |
 | `README.md`, `CHANGELOG.md` | Project overview; one line per merged change |
 | `LICENSE` | MIT |
+| `visuals/` | A core-lens visual of the repo (HTML, its `.md` and `files.txt`); `source.txt` git-ignored. Not rendered into the site |
 
 ## 7. Decisions made
 
